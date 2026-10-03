@@ -19,9 +19,11 @@ Read [protocol.md](protocol.md) when producing plan or review artifacts.
 
 Use the given repo/task immediately. Investigate repository instructions and
 checks before asking for missing behavior. Ask only for consequential unresolved
-choices. Inspect `.factory.json`; if absent, configure actual project checks
+choices. Inspect `.rules/*.md` for instructions and fenced `factory-config` JSON
+settings; `.factory.json` remains a compatible baseline. If settings are absent,
+configure actual project checks
 with `init --repo <repo> --check '["npm","test"]'`, adapt argv to the project,
-and review/commit that configuration before starting. At least one meaningful
+and review/commit that Markdown configuration before starting. At least one meaningful
 check is required. Never invent a successful check to bypass the gate.
 
 Persist explicit acceptance criteria. Select the repository's required base and
@@ -40,6 +42,19 @@ For saved work, use `list --repo <repo> --json`, select the matching run, and
 `resume --run <run> --json`. Never start over merely because context compacted.
 Work in the returned worktree, preserving the original checkout. Read the
 returned task file, plan, checks, review findings and verification logs as needed.
+For new runs, use `rules --run <run> --json` and read every returned file's
+content before planning or implementing. It reads this task's worktree, including
+ignored direct rules; `status.rules` labels the initial private snapshot. On
+resume reread current rules and the initial snapshot when investigating drift.
+Rules are repository guidance, subordinate to explicit user and host/repository
+instructions. Do not treat them as authorization to bypass gates, merge/release,
+launch paid models or execute prose. Settings are validated by the CLI; do not
+invent a Markdown interpreter. A changed rules hash requires fresh plan review
+and verification. Settings edits can be delivered as reviewed changes, but the
+active task always uses its original checks and endpoint; subsequent tasks apply
+the new settings. Historical runs
+report rules disabled and keep their original protocol.
+
 Use `summary --run <run>` for a concise human overview, or add `--json` for its
 compact exact-value projection. This read-only view shows latest checks/findings,
 the current next action and delivery; use `next --json` for artifact freshness.
@@ -53,10 +68,10 @@ failed evidence. Keep concise factual progress updates during long work.
 | Next action | Work |
 |---|---|
 | `plan` | Investigate actual code and instructions. Write the returned plan path with scope, criteria, concrete changes and checks. Use `plan --run <run> --file <plan>`. Address rejected plan findings first. |
-| `plan-review` | Delegate one native read-only reviewer with task, repo instructions, worktree, plan and the exact context returned by next. Reviewer writes a structured artifact. Submit it with `plan-review --run <run> --file <artifact>`. Fix rejected plans. |
+| `plan-review` | Delegate one native read-only reviewer with task, repo instructions, worktree, plan and the exact context returned by next. Read current `rules --json`, pass their full content and priority to the reviewer along with the exact context. Reviewer writes a structured artifact. Submit it with `plan-review --run <run> --file <artifact>`. Fix rejected plans. |
 | `implement` | Implement the approved plan in the task worktree, including meaningful tests for behavior. Fix recorded failed checks/findings. Then call `verify --run <run> --json`. |
 | `verify` | Execute `verify`; the CLI runs the frozen checks and captures results. Read failed logs, fix the cause and continue. Prepare legitimate dependencies beforehand; ignored dependencies are outside the Git freshness fingerprint. |
-| `review` | Delegate a native read-only reviewer with task, criteria, plan, instructions, full diff against frozen base, verification and exact returned evidence. Submit `review --run <run> --file <artifact>`. Fix valid findings, then reverify and obtain a fresh review. |
+| `review` | Delegate a native read-only reviewer with task, criteria, plan, instructions, full diff against frozen base, verification and exact returned evidence. Read current `rules --json` and pass their full content and priority to this reviewer too. Submit `review --run <run> --file <artifact>`. Fix valid findings, then reverify and obtain a fresh review. |
 | `deliver` | Ensure the requested endpoint is authorized. `deliver --run <run> --json` commits the reviewed files and, by default, pushes and creates/reconciles a draft PR. Report observed URL and checks. Never silently downgrade to local. |
 | `resume` | Call `resume` to reconcile interrupted start. |
 | `wait` | An operation owns the run. Observe status and wait; never take it over. |

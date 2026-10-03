@@ -25,13 +25,11 @@ Requires Node 22+, Git, macOS/Linux, and `gh` authenticated for GitHub delivery.
 Install from the source (there is no published npm release yet):
 
 ```sh
-git clone --branch feature/software-factory https://github.com/natejswenson/software-factory.git
+git clone https://github.com/natejswenson/software-factory.git
 cd software-factory
 npm install --global .
 factory --help
 ```
-
-During initial review, use the draft PR's branch: `feature/software-factory`.
 
 Add the skill to your agent. Symlink the bundled directory so its code remains
 available; replace `/path/to/software-factory` with this checkout's real path:
@@ -58,13 +56,14 @@ Select checks that actually establish the project's behavior:
 factory init --repo /path/to/app --check '["npm","test"]' --check '["npm","run","build"]'
 ```
 
-Review and commit `.factory.json` on your selected base. Checks use argv arrays,
-so paths and arguments containing spaces remain literal. Configure names and
-`timeoutMs` (100–600000) in that file. Check definitions are frozen at task start;
-editing the project configuration cannot weaken an active task's verification.
-Configuration changes themselves appear in the reviewed diff.
+`init` creates `.rules/factory.md`. Review and commit it on your selected base.
+Settings and repository instructions live together in Markdown. For example,
+create `.rules/factory.md` with:
 
-```json
+````markdown
+# Software Factory
+
+```factory-config
 {
   "version": 1,
   "endpoint": "draft-pr",
@@ -73,6 +72,53 @@ Configuration changes themselves appear in the reviewed diff.
   ]
 }
 ```
+
+## Repository instructions
+
+Use the existing module patterns. Add a regression test for each bug fix.
+Explain any change to public APIs in the README.
+````
+
+Add other instructions in files such as `.rules/testing.md` and
+`.rules/review.md`. Direct lowercase `*.md` files are read in lexical filename
+order; nested directories and other extensions are skipped. Missing `.rules`
+means no extra instructions. Files must be regular UTF-8 files, at most 128 KiB
+each, 128 files and 1 MiB total. Symlinks are rejected. Instructions are read by
+the agent and both reviewers; the CLI does not execute Markdown or interpret
+natural language as check commands. Explicit user and host/repository
+instructions take priority. Rules do not authorize merges or bypass review.
+
+A `factory-config` fence (backticks or tildes) contains a JSON object with only
+`version`, `endpoint` and `checks`. Settings can be split among files, but each
+key may appear only once across all config blocks. Duplicate JSON keys,
+unknown settings and malformed/unterminated config blocks are errors. Examples
+inside another code fence are not settings. Default version is 1 and endpoint
+is `draft-pr`; at least one meaningful check is required. Checks use literal
+argv arrays and `timeoutMs` (100–600000). No shell is added.
+
+Existing `.factory.json` projects remain supported. When both formats exist,
+the valid legacy file provides the baseline and Markdown settings explicitly
+override its keys. To migrate, move the JSON into a `factory-config` fence and
+remove `.factory.json`; commit both changes before starting the next task.
+`init` refuses existing settings rather than overwriting them.
+
+Configuration and selected rules must match the committed selected base at
+start. The task then reads rules from its own worktree; edits in the original
+checkout cannot replace those instructions. `factory rules --run <run>` prints
+current rules; `--json` returns exact file paths, content, hashes and the initial
+snapshot path. Initial content is preserved privately as `rules-initial.json`
+and in saved state; `status` labels its initial hash and paths. Resume retains
+that snapshot and checks current worktree instructions.
+
+Adding, editing or removing a rule requires fresh plan review, checks and code
+review before delivery, even if the rule file is ignored by Git. Settings are
+frozen at task start: editing Markdown settings requires fresh plan review,
+verification with the original checks and code review. The active task keeps its
+original endpoint as well. Reviewed settings changes can be delivered normally;
+subsequent tasks use the new configuration. Changes to legacy
+`.factory.json` retain the existing frozen-check behavior and appear in the
+reviewed diff. Runs created before rules support retain their original evidence
+protocol; rules apply automatically to new runs without rewriting old receipts.
 
 ## Tasks and recovery
 
@@ -84,6 +130,7 @@ factory start --repo /path/to/app --task "Fix empty search results" \
   --worktree-root /path/to/approved/worktrees
 factory list --repo /path/to/app
 factory summary --run /path/returned/by/start
+factory rules --run /path/returned/by/start
 factory next --run /path/returned/by/start --json
 factory resume --run /path/returned/by/start --json
 ```
@@ -127,7 +174,7 @@ through `status --json`. Like status, a blocked run returns exit code 2.
 The snapshot includes tracked files even under ignore rules, nonignored new
 files, deletions, executable modes and symlink targets. Check commands must all
 pass without changing that snapshot. Review binds the plan, criteria, checks,
-base, HEAD and Git tree. Delivery observes the exact committed tree and, for
+repository rules, base, HEAD and Git tree. Delivery observes the exact committed tree and, for
 GitHub, an open draft PR with the same branch/head/base.
 
 The engine validates evidence structure and freshness. It cannot prove that a

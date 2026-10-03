@@ -2,6 +2,10 @@
 
 Write JSON with normal file tools; task text is never shell code. The CLI gives
 the exact freshness object in `next.context` or `next.evidence`; copy it intact.
+For new runs these objects also include `rules`; preserve it exactly.
+Read `factory rules --run ... --json` and give all current rule content to both
+reviewers. Rule changes invalidate plan approval, including ignored files.
+Historical runs omit `rules`; never add it to their existing receipts.
 Object-key order is irrelevant. Produce files in the private run directory.
 
 Plan Markdown states the task, observable criteria, inspected code/instructions,

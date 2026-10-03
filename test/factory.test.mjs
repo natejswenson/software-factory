@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, symlinkSync, unlinkSync, realpathSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir, hostname } from 'node:os';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { start, describe, resume, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover } from '../lib/factory.mjs';
+import { init, start, describe, resume, taskRules, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover } from '../lib/factory.mjs';
 import { git, snapshot } from '../lib/git.mjs';
 import { readRun, readJSON, atomicJSON, locked, listRuns } from '../lib/store.mjs';
 import { executeCheck, validateConfig } from '../lib/checks.mjs';
+import { readRules, settings, readProject } from '../lib/rules.mjs';
 
 const cli = resolve('bin/factory.mjs');
 function fixture(t, options = {}) {
@@ -405,4 +406,258 @@ test('summary shows pending PR receipt during delivery recovery and exact comple
   assert.ok(existsSync(file)); run = await deliver(run.run);
   const complete = summaryOutput(run); assert.deepEqual(complete.delivery, run.delivery);
   assert.ok(summaryOutput(run, false).includes(run.delivery.pr)); assert.equal(complete.next.action, 'done');
+});
+
+
+function ruleFile(root, name, content) {
+  mkdirSync(join(root, '.rules'), { recursive: true });
+  writeFileSync(join(root, '.rules', name), content);
+}
+function configFence(config, prose = 'Use repository conventions.') {
+  return `${prose}\n\n\`\`\`factory-config\n${JSON.stringify(config, null, 2)}\n\`\`\`\n`;
+}
+function commitRules(f) {
+  git(f.repo, ['add', '-A', '--', '.rules', '.factory.json']);
+  git(f.repo, ['commit', '-m', 'repository rules fixture']);
+}
+async function approveCurrentPlan(run) {
+  const status = describe(readRun(run.run));
+  return submitPlanReview(run.run, jsonFile(run.run, 'updated-plan-review.json', {
+    reviewer: 'synthetic rules fixture', verdict: 'pass', findings: [], context: status.next.context,
+  }));
+}
+test('init creates Markdown configuration without overwriting existing project rules', async t => {
+  const f = fixture(t); rmSync(join(f.repo, '.factory.json'));
+  ruleFile(f.repo, 'conventions.md', '# Conventions\nUse built-in modules.\n');
+  const checks = [{ name: 'behavior', argv: [process.execPath, 'check.mjs'], timeoutMs: 2000 }];
+  const initialized = init(f.repo, checks);
+  assert.equal(initialized.config, join(realpathSync(f.repo), '.rules', 'factory.md'));
+  assert.deepEqual(readProject(f.repo).config.checks, checks);
+  assert.match(readFileSync(join(f.repo, '.rules', 'conventions.md'), 'utf8'), /built-in modules/);
+  assert.throws(() => init(f.repo, checks), /already exists/);
+  commitRules(f);
+  const run = await checked(f);
+  assert.equal(run.verification.passed, true);
+  await submitReview(run.run, jsonFile(run.run, 'markdown-review.json', codeReview(run)));
+  // init defaults to draft-pr; test explicitly selects the local endpoint for delivery.
+  const local = await reviewed({ ...f, opts: { ...f.opts, endpoint: 'local' } });
+  assert.equal((await deliver(local.run)).phase, 'done');
+});
+test('Markdown-only settings can be split across sorted rules and remain repository scoped', async t => {
+  const a = fixture(t), b = fixture(t, { endpoint: 'draft-pr' });
+  const config = readJSON(join(a.repo, '.factory.json'));
+  rmSync(join(a.repo, '.factory.json'));
+  ruleFile(a.repo, '20-checks.md', configFence({ checks: config.checks }, 'Use tests from repo A.'));
+  ruleFile(a.repo, '10-policy.md', configFence({ endpoint: 'local', version: 1 }, 'Plan repo A carefully.'));
+  ruleFile(a.repo, 'skip.txt', 'not a rule');
+  mkdirSync(join(a.repo, '.rules', 'nested'));
+  writeFileSync(join(a.repo, '.rules', 'nested', 'skip.md'), configFence({ unknown: true }));
+  ruleFile(b.repo, 'guide.md', 'Instructions for repo B only.');
+  commitRules(a); commitRules(b);
+  const ar = await planned(a), br = await start(b.opts);
+  const rules = taskRules(readRun(ar.run));
+  assert.deepEqual(rules.files.map(f => f.path), ['.rules/10-policy.md', '.rules/20-checks.md']);
+  assert.ok(!JSON.stringify(rules).includes('repo B'));
+  assert.match(taskRules(readRun(br.run)).files[0].content, /repo B/);
+  assert.deepEqual(ar.checks, config.checks);
+  assert.equal(readRun(ar.run).planReview.context.rules, rules.hash);
+  assert.notEqual(readRun(ar.run).configHash, readRun(br.run).configHash);
+  assert.equal(ar.endpoint, 'local'); assert.equal(br.endpoint, 'draft-pr');
+});
+test('Markdown settings explicitly override legacy settings and CLI rules preserves exact content', async t => {
+  const f = fixture(t, { endpoint: 'draft-pr' });
+  const content = configFence({ endpoint: 'local' }, 'Keep Unicode ✓, false, 0 and literal `commands`.\nSecond line.');
+  ruleFile(f.repo, 'policy.md', content); commitRules(f);
+  const run = await start(f.opts); assert.equal(run.endpoint, 'local');
+  const args = [cli, 'rules', '--run', run.run];
+  const output = JSON.parse(execFileSync(process.execPath, [...args, '--json'], { encoding: 'utf8' }));
+  assert.equal(output.files[0].content, content);
+  assert.match(execFileSync(process.execPath, args, { encoding: 'utf8' }), /# .rules\/policy.md/);
+  assert.deepEqual(readJSON(output.snapshot), readRun(run.run).rules.initial);
+  const resumed = JSON.parse(execFileSync(process.execPath, [cli, 'resume', '--run', run.run, '--json'], { encoding: 'utf8' }));
+  assert.equal(resumed.rules.initialHash, output.hash);
+  // An unrelated edit in the original checkout cannot replace this worktree's rules.
+  ruleFile(f.repo, 'policy.md', 'original checkout changed');
+  assert.equal(taskRules(readRun(run.run)).files[0].content, content);
+});
+test('missing rules is compatible and historical runs retain their exact evidence protocol', async t => {
+  const f = fixture(t); const run = await planned(f);
+  assert.deepEqual(taskRules(readRun(run.run)).files, []);
+  const state = readRun(run.run);
+  // Synthetic migration fixture simulates a run made before rules support.
+  delete state.rules; delete state.planReview.context.rules;
+  atomicJSON(join(run.run, 'state.json'), state);
+  ruleFile(run.worktree, 'new.md', 'Instructions do not retroactively change a historical run.');
+  assert.equal(taskRules(readRun(run.run)).enabled, false);
+  assert.equal(describe(readRun(run.run)).next.action, 'implement');
+  writeFileSync(join(run.worktree, 'value.txt'), 'new\n');
+  const verified = await verify(run.run);
+  assert.equal(Object.hasOwn(verified.next.evidence, 'rules'), false);
+  await submitReview(run.run, jsonFile(run.run, 'historical-review.json', codeReview(verified)));
+  assert.equal((await deliver(run.run)).phase, 'done');
+});
+test('edits, additions and removal of rules invalidate plan, verification and delivery', async t => {
+  for (const operation of ['edit', 'add', 'remove']) {
+    const f = fixture(t); ruleFile(f.repo, 'guide.md', 'Original instructions.'); commitRules(f);
+    const run = await reviewed(f);
+    const initial = readFileSync(run.rules.snapshot);
+    const stale = readRun(run.run).codeReview;
+    if (operation === 'edit') ruleFile(run.worktree, 'guide.md', 'Updated instructions.');
+    if (operation === 'add') ruleFile(run.worktree, 'more.md', 'Additional instructions.');
+    if (operation === 'remove') rmSync(join(run.worktree, '.rules', 'guide.md'));
+    assert.equal(describe(readRun(run.run)).next.action, 'plan-review');
+    await assert.rejects(verify(run.run), /plan review/);
+    await assert.rejects(deliver(run.run), /plan review/);
+    assert.deepEqual(readFileSync(run.rules.snapshot), initial);
+    await approveCurrentPlan(run);
+    const fresh = await verify(run.run); assert.equal(fresh.verification.passed, true);
+    await assert.rejects(submitReview(run.run, jsonFile(run.run, 'stale-review.json', stale)), /stale/);
+    await submitReview(run.run, jsonFile(run.run, 'fresh-review.json', codeReview(fresh)));
+    assert.equal((await deliver(run.run)).phase, 'done');
+  }
+});
+test('ignored rules still invalidate evidence and cannot bypass interrupted commit recovery', async t => {
+  const f = fixture(t);
+  writeFileSync(join(f.repo, '.gitignore'), 'ignored*\n.rules/local.md\n');
+  git(f.repo, ['add', '.gitignore']); git(f.repo, ['commit', '-m', 'ignore local rule fixture']);
+  const run = await reviewed(f), state = readRun(run.run);
+  const before = snapshot(run.worktree, state.base);
+  state.commitIntent = { parent: before.head, tree: before.tree, paths: before.paths }; atomicJSON(join(run.run, 'state.json'), state);
+  git(run.worktree, ['add', '--', ...before.paths]); git(run.worktree, ['commit', '-m', 'interrupted rules delivery fixture']);
+  ruleFile(run.worktree, 'local.md', 'Ignored but relevant instructions.');
+  assert.equal(snapshot(run.worktree, state.base).tree, before.tree);
+  assert.equal(describe(readRun(run.run)).next.action, 'plan-review');
+  await assert.rejects(deliver(run.run), /plan review/);
+  await approveCurrentPlan(run);
+  const fresh = await verify(run.run);
+  await submitReview(run.run, jsonFile(run.run, 'ignored-rules-review.json', codeReview(fresh)));
+  assert.equal((await deliver(run.run)).phase, 'done');
+});
+test('settings changes cannot switch an active task to weaker checks', async t => {
+  const f = fixture(t); ruleFile(f.repo, 'factory.md', configFence({ endpoint: 'local' })); commitRules(f);
+  const run = await reviewed(f), checks = run.checks;
+  const weaker = [{ name: 'fake', argv: [process.execPath, '-e', 'process.exit(0)'], timeoutMs: 1000 }];
+  ruleFile(run.worktree, 'factory.md', configFence({ endpoint: 'draft-pr', checks: weaker }));
+  assert.equal(describe(readRun(run.run)).next.action, 'plan-review');
+  await assert.rejects(deliver(run.run), /plan review/);
+  assert.deepEqual(readRun(run.run).config.checks, checks);
+  await approveCurrentPlan(run);
+  writeFileSync(join(run.worktree, 'value.txt'), 'old\n');
+  const failed = await verify(run.run);
+  assert.equal(failed.verification.passed, false);
+  assert.equal(failed.verification.results[0].name, 'behavior');
+  assert.equal(failed.endpoint, 'local');
+  writeFileSync(join(run.worktree, 'value.txt'), 'new\n');
+  const verified = await verify(run.run);
+  await submitReview(run.run, jsonFile(run.run, 'config-edit-review.json', codeReview(verified)));
+  assert.equal((await deliver(run.run)).phase, 'done');
+  const next = await start({ ...f.opts, repo: run.worktree, base: run.branch, task: 'Use new settings' });
+  assert.deepEqual(next.checks, weaker); assert.equal(next.endpoint, 'draft-pr');
+});
+test('rules and settings must match the selected committed base', async t => {
+  const f = fixture(t);
+  ruleFile(f.repo, 'guide.md', 'Uncommitted instructions');
+  await assert.rejects(start(f.opts), /committed on the selected base/);
+  commitRules(f); git(f.repo, ['branch', 'lower']);
+  ruleFile(f.repo, 'guide.md', 'New instructions'); commitRules(f);
+  await assert.rejects(start({ ...f.opts, base: 'lower' }), /committed on the selected base/);
+  assert.equal((await start(f.opts)).phase, 'plan');
+});
+test('configuration parser rejects malformed, duplicate and unknown settings with file context', t => {
+  const f = fixture(t);
+  for (const [body, pattern] of [
+    ['```factory-config\n{bad}\n```', /invalid factory configuration JSON/],
+    ['```factory-config\n{}', /unterminated/],
+    [configFence({ version: 2 }), /version 1/],
+    [configFence({ checks: [] }), /at least one/],
+    [configFence({ checks: [{ name: 'test', argv: 'npm test', timeoutMs: 1000 }] }), /argv/],
+    [configFence({ unexpected: true }), /unknown factory setting/],
+    ['```factory-config\n{"endpoint":"local","end\\u0070oint":"draft-pr"}\n```', /duplicate JSON key/],
+    ['```factory-config\n{"checks":[{"name":"a","name":"b"}]}\n```', /duplicate JSON key/],
+    [configFence({ endpoint: 'local' }) + configFence({ endpoint: 'local' }), /duplicate factory setting/],
+    [configFence(null), /JSON object/],
+  ]) {
+    ruleFile(f.repo, 'bad.md', body);
+    assert.throws(() => readProject(f.repo), pattern);
+  }
+  ruleFile(f.repo, 'bad.md', configFence({ endpoint: 'local' }));
+  ruleFile(f.repo, 'other.md', configFence({ endpoint: 'draft-pr' }));
+  assert.throws(() => readProject(f.repo), /duplicate factory setting/);
+});
+test('example code fences do not accidentally configure the project', t => {
+  const f = fixture(t);
+  ruleFile(f.repo, 'examples.md', '````markdown\n```factory-config\n{"unexpected":true}\n```\n````\n\n~~~factory-config\n{"endpoint":"local"}\n~~~\n');
+  assert.deepEqual(settings(readRules(f.repo)), { endpoint: 'local' });
+});
+test('rules reject symlinks, directories, invalid UTF-8 and excessive input', async t => {
+  const f = fixture(t), external = join(f.root, 'external.md'); writeFileSync(external, 'private external fixture');
+  symlinkSync(f.root, join(f.repo, '.rules'));
+  assert.throws(() => readRules(f.repo), /not a symlink/); unlinkSync(join(f.repo, '.rules'));
+  mkdirSync(join(f.repo, '.rules'));
+  symlinkSync(external, join(f.repo, '.rules', 'link.md'));
+  assert.throws(() => readRules(f.repo), /regular file/); rmSync(join(f.repo, '.rules', 'link.md'));
+  mkdirSync(join(f.repo, '.rules', 'directory.md'));
+  assert.throws(() => readRules(f.repo), /regular file/); rmSync(join(f.repo, '.rules', 'directory.md'), { recursive: true });
+  ruleFile(f.repo, 'invalid.md', Buffer.from([0xff, 0xfe]));
+  assert.throws(() => readRules(f.repo), /valid UTF-8/); rmSync(join(f.repo, '.rules', 'invalid.md'));
+  ruleFile(f.repo, 'large.md', 'x'.repeat(128 * 1024 + 1));
+  assert.throws(() => readRules(f.repo), /128 KiB/); rmSync(join(f.repo, '.rules', 'large.md'));
+  for (let i = 0; i < 9; i++) ruleFile(f.repo, `${i}.md`, 'x'.repeat(128 * 1024));
+  assert.throws(() => readRules(f.repo), /1 MiB/);
+  rmSync(join(f.repo, '.rules'), { recursive: true });
+  for (let i = 0; i < 129; i++) ruleFile(f.repo, `${i}.md`, 'x');
+  assert.throws(() => readRules(f.repo), /128 files/);
+});
+
+test('a check that writes ignored rules cannot certify its own verification', async t => {
+  const f = fixture(t);
+  writeFileSync(join(f.repo, '.gitignore'), 'ignored*\n.rules/local.md\n');
+  writeFileSync(join(f.repo, 'check.mjs'), `import {mkdirSync,writeFileSync} from 'node:fs'; mkdirSync('.rules',{recursive:true}); writeFileSync('.rules/local.md','Instructions changed during checks.');\n`);
+  git(f.repo, ['add', '--', '.gitignore', 'check.mjs']); git(f.repo, ['commit', '-m', 'rules writer fixture']);
+  const run = await planned(f); writeFileSync(join(run.worktree, 'value.txt'), 'new\n');
+  const result = await verify(run.run);
+  assert.equal(result.verification.results[0].passed, true);
+  assert.equal(result.verification.unchanged, false);
+  assert.equal(result.verification.passed, false);
+  assert.equal(result.next.action, 'plan-review');
+});
+test('interrupted start restores the initial rule receipt and rules command is read only', async t => {
+  const f = fixture(t); ruleFile(f.repo, 'guide.md', 'Frozen initial rules.'); commitRules(f);
+  const run = await start(f.opts), state = readRun(run.run);
+  state.phase = 'preparing'; atomicJSON(join(run.run, 'state.json'), state);
+  rmSync(run.rules.snapshot);
+  await resume(run.run);
+  assert.equal(readJSON(run.rules.snapshot).files[0].content, 'Frozen initial rules.');
+  const before = readFileSync(join(run.run, 'state.json'));
+  const status = git(run.worktree, ['status', '--porcelain']);
+  const index = git(run.worktree, ['write-tree']);
+  const output = JSON.parse(execFileSync(process.execPath, [cli, 'rules', '--run', run.run, '--json'], { encoding: 'utf8' }));
+  assert.equal(output.hash, run.rules.initialHash);
+  assert.deepEqual(readFileSync(join(run.run, 'state.json')), before);
+  assert.equal(git(run.worktree, ['status', '--porcelain']), status);
+  assert.equal(git(run.worktree, ['write-tree']), index);
+});
+test('a symlink rules directory on the base cannot be hidden by a dirty source deletion', async t => {
+  const f = fixture(t); symlinkSync(f.root, join(f.repo, '.rules'));
+  git(f.repo, ['add', '--', '.rules']); git(f.repo, ['commit', '-m', 'synthetic symlink rules fixture']);
+  unlinkSync(join(f.repo, '.rules'));
+  await assert.rejects(start(f.opts), /selected base must be a directory/);
+});
+
+test('committed directories cannot masquerade as absent configuration files', async t => {
+  for (const kind of ['legacy', 'rule']) {
+    const f = fixture(t);
+    if (kind === 'legacy') {
+      rmSync(join(f.repo, '.factory.json'));
+      mkdirSync(join(f.repo, '.factory.json'));
+      writeFileSync(join(f.repo, '.factory.json', 'child'), 'not configuration');
+      ruleFile(f.repo, 'factory.md', configFence({ checks: [{ name: 'test', argv: [process.execPath, 'check.mjs'], timeoutMs: 2000 }] }));
+    } else {
+      mkdirSync(join(f.repo, '.rules', 'directory.md'), { recursive: true });
+      writeFileSync(join(f.repo, '.rules', 'directory.md', 'child'), 'not a rule');
+    }
+    commitRules(f);
+    rmSync(join(f.repo, kind === 'legacy' ? '.factory.json' : '.rules/directory.md'), { recursive: true });
+    await assert.rejects(start(f.opts), /committed configuration must be a regular file/);
+  }
 });
