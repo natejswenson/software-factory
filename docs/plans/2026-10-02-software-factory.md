@@ -87,8 +87,8 @@ skill frontmatter validation; independent plan review; independent forward task.
 Tests target stale plan/tree evidence, failing/timeout checks, zero checks, review
 findings, unrelated dirty source, concurrent operations, interrupted recovery,
 paths with spaces, issue snapshot and GitHub response validation/retry via local mocks.
-No live remote publication exists for this new repository; test GitHub adapter
-locally and report that limitation.
+Test GitHub adapter locally, then observe live draft PR and matching head on the
+authorized new repository. Local mock results remain distinct from live evidence.
 
 ## Review
 Independent read-only reviewer `/root/plan_review` identified six corrections:
