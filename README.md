@@ -83,6 +83,7 @@ factory start --repo /path/to/app --task "Fix empty search results" \
   --criterion "Empty search shows a clear message" --base main \
   --worktree-root /path/to/approved/worktrees
 factory list --repo /path/to/app
+factory summary --run /path/returned/by/start
 factory next --run /path/returned/by/start --json
 factory resume --run /path/returned/by/start --json
 ```
@@ -104,6 +105,22 @@ blocked run only under explicit user direction.
 Read the [skill](skills/software-factory/SKILL.md) and
 [artifact protocol](skills/software-factory/protocol.md) for plan/review commands.
 Use `--json` for every command when integrating another agent or UI.
+
+`summary` is a read-only overview: task, criteria, last check results, findings
+from the latest plan and code reviews, next action and delivery. Checks not
+executed in the last attempt say `not run`, including checks skipped after a
+failure. Findings stay visible until a newer review or verification supersedes
+them. Last results may be stale after edits; the next action reflects the current
+files. A committed change with PR delivery still pending is shown as pending.
+
+`summary --json` emits one compact line with `id`, `task`, `phase`, `endpoint`,
+`criteria`, `checks`, `verification`, `findings`, `next` and `delivery`.
+Each configured check contains its exact `result`, or `null` when unrun.
+`verification` retains `passed`, `unchanged` and `at`; `findings` has `plan` and
+`code` arrays. `next` retains action, reason and applicable recovery details,
+without review context or Git evidence. `delivery` is the exact current receipt
+or `null`. Strings and result values are preserved; full evidence is available
+through `status --json`. Like status, a blocked run returns exit code 2.
 
 ## What the evidence establishes
 

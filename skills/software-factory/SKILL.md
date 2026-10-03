@@ -40,6 +40,9 @@ For saved work, use `list --repo <repo> --json`, select the matching run, and
 `resume --run <run> --json`. Never start over merely because context compacted.
 Work in the returned worktree, preserving the original checkout. Read the
 returned task file, plan, checks, review findings and verification logs as needed.
+Use `summary --run <run>` for a concise human overview, or add `--json` for its
+compact exact-value projection. This read-only view shows latest checks/findings,
+the current next action and delivery; use `next --json` for artifact freshness.
 
 ## Drive the loop
 

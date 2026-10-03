@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { init, start, describe, resume, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover, recoverAllocation } from '../lib/factory.mjs';
 import { readRun, listRuns } from '../lib/store.mjs';
 import { repository, FactoryError } from '../lib/git.mjs';
+import { summarize, formatSummary } from '../lib/summary.mjs';
 
 const help = `Software Factory — take one task to verified delivery in your current agent session.
 
@@ -14,6 +15,7 @@ const help = `Software Factory — take one task to verified delivery in your cu
   factory start --repo PATH --issue 42 --criterion "Outcome" --worktree-root PATH
   factory list --repo PATH
   factory status|next|resume --run PATH
+  factory summary --run PATH [--json]
   factory plan|plan-review|review --run PATH --file PATH
   factory verify|deliver --run PATH
   factory recover --run PATH | --repo PATH
@@ -52,6 +54,7 @@ try {
     }
     case 'list': result = listRuns(repository(required('repo')).common).map(r => ({ id: r.id, task: r.task.split('\n')[0], phase: r.phase, endpoint: r.endpoint, run: r.dir })); break;
     case 'status': case 'next': result = describe(readRun(run())); break;
+    case 'summary': result = summarize(readRun(run())); break;
     case 'resume': result = await resume(run()); break;
     case 'plan': result = await submitPlan(run(), required('file')); break;
     case 'plan-review': result = await submitPlanReview(run(), required('file')); break;
@@ -62,7 +65,8 @@ try {
     case 'extend': result = await extend(run(), Number(required('attempts')), required('reason')); break;
     default: throw new FactoryError(`Unknown command: ${action}. Use --help.`);
   }
-  if (json) console.log(JSON.stringify(result, null, 2));
+  if (json) console.log(JSON.stringify(result, null, action === 'summary' ? undefined : 2));
+  else if (action === 'summary') console.log(formatSummary(result));
   else if (Array.isArray(result)) {
     console.log('TASK\tSTATE\tENDPOINT\tRUN');
     for (const r of result) console.log(`${r.task}\t${r.phase}\t${r.endpoint}\t${r.run}`);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, symlinkSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir, hostname } from 'node:os';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { start, describe, resume, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover } from '../lib/factory.mjs';
 import { git, snapshot } from '../lib/git.mjs';
 import { readRun, readJSON, atomicJSON, locked, listRuns } from '../lib/store.mjs';
@@ -284,4 +284,125 @@ test('recovering a killed start also clears its dead allocation lock', async t =
   mkdirSync(join(allocation, 'lock')); atomicJSON(join(allocation, 'lock', 'owner.json'), { pid: 2147483647, host: hostname() });
   assert.equal(recover(run.run).allocation.recovered, true);
   assert.notEqual((await start({ ...f.opts, task: 'Another task' })).id, run.id);
+});
+
+// Summary exercises the public CLI against real lifecycle fixtures. Any manual
+// interruption state below belongs only to these temporary synthetic runs.
+function summaryOutput(run, json = true) {
+  const statePath = join(run.run, 'state.json');
+  const before = readFileSync(statePath);
+  const status = git(run.worktree, ['status', '--porcelain=v1']);
+  const index = git(run.worktree, ['write-tree']);
+  const output = spawnSync(process.execPath, [cli, 'summary', '--run', run.run, ...(json ? ['--json'] : [])], { encoding: 'utf8' });
+  assert.equal(output.status, readRun(run.run).phase === 'blocked' ? 2 : 0, output.stderr);
+  assert.deepEqual(readFileSync(statePath), before, 'summary must preserve saved state bytes');
+  assert.equal(git(run.worktree, ['status', '--porcelain=v1']), status);
+  assert.equal(git(run.worktree, ['write-tree']), index, 'summary must preserve the index');
+  if (!json) return output.stdout;
+  assert.equal(output.stdout.trim().split('\n').length, 1, 'JSON is one compact line');
+  return JSON.parse(output.stdout);
+}
+test('summary before checks preserves exact multiline task/criteria and scans in human form', async t => {
+  const f = fixture(t);
+  const task = 'Fix “empty” output\n\nKeep values: false, 0, `literal` and unicode ✓';
+  const run = await start({ ...f.opts, task, criteria: ['Value equals new', 'Keep second criterion\nwith detail'] });
+  const output = summaryOutput(run);
+  assert.deepEqual(Object.keys(output).sort(), ['id', 'task', 'phase', 'endpoint', 'criteria', 'checks', 'verification', 'findings', 'next', 'delivery'].sort());
+  assert.equal(output.task, task); assert.deepEqual(output.criteria, run.criteria);
+  assert.deepEqual(output.checks, run.checks.map(c => ({ ...c, result: null })));
+  assert.equal(output.verification, null); assert.equal(output.delivery, null);
+  assert.deepEqual(output.findings, { plan: [], code: [] });
+  assert.deepEqual(output.next, { action: 'plan' });
+  const human = summaryOutput(run, false);
+  for (const label of ['Task:', 'Criteria:', 'Checks:', 'Findings:', 'Next:', 'Delivery:']) assert.ok(human.includes(label), label);
+  assert.ok(human.includes(task)); assert.match(human, /AC2: Keep second criterion/);
+  assert.match(human, /behavior: not run/); assert.match(human, /Delivery: pending/);
+  assert.ok(!human.includes('"evidence"'));
+});
+test('summary reports failed check, skipped checks, exact diagnostics and subsequent repair', async t => {
+  const f = fixture(t);
+  const config = readJSON(join(f.repo, '.factory.json'));
+  config.checks.push({ name: 'later', argv: [process.execPath, '-e', 'process.exit(0)'], timeoutMs: 2000 });
+  atomicJSON(join(f.repo, '.factory.json'), config); git(f.repo, ['add', '.factory.json']); git(f.repo, ['commit', '-m', 'second check']);
+  const run = await planned(f); const failed = await verify(run.run);
+  const output = summaryOutput(failed);
+  assert.deepEqual(output.checks[0].result, readRun(run.run).verification.results[0]);
+  assert.equal(output.checks[0].result.exitCode, 1); assert.equal(output.checks[1].result, null);
+  assert.deepEqual(output.verification, { passed: false, unchanged: true, at: failed.verification.at });
+  assert.deepEqual(output.next, failed.next);
+  const human = summaryOutput(failed, false);
+  assert.match(human, /behavior: failed/); assert.match(human, /later: not run/); assert.ok(human.includes(failed.verification.results[0].log));
+  writeFileSync(join(run.worktree, 'value.txt'), 'new\n');
+  const passed = await verify(run.run); assert.equal(summaryOutput(passed).next.action, 'review');
+  assert.ok(summaryOutput(passed).checks.every(c => c.result.passed));
+  writeFileSync(join(run.worktree, 'extra'), 'drift');
+  const stale = summaryOutput(passed);
+  assert.equal(stale.verification.passed, true, 'retain exact last check result');
+  assert.equal(stale.next.action, 'verify', 'next reflects drift');
+});
+test('summary surfaces latest rejected plan/code findings and clears superseded reviews', async t => {
+  const f = fixture(t); let run = await planned(f);
+  const planFinding = { severity: 'major', location: 'plan:7', issue: 'Missing edge case\nexact detail' };
+  const context = readRun(run.run).planReview.context;
+  run = await submitPlanReview(run.run, jsonFile(run.run, 'summary-rejected-plan.json', { reviewer: 'synthetic summary fixture', verdict: 'fail', context, findings: [planFinding] }));
+  assert.deepEqual(summaryOutput(run).findings, { plan: [planFinding], code: [] });
+  assert.equal(summaryOutput(run).next.action, 'plan');
+  assert.ok(summaryOutput(run, false).includes(planFinding.issue));
+  run = await submitPlanReview(run.run, jsonFile(run.run, 'summary-approved-plan.json', { reviewer: 'synthetic summary fixture', verdict: 'pass', context, findings: [] }));
+  writeFileSync(join(run.worktree, 'value.txt'), 'new\n'); run = await verify(run.run);
+  const finding = { severity: 'major', location: 'value.txt:1', issue: 'Missing review coverage' };
+  run = await submitReview(run.run, jsonFile(run.run, 'summary-rejected-code.json', codeReview(run, { verdict: 'fail', findings: [finding] })));
+  assert.deepEqual(summaryOutput(run).findings, { plan: [], code: [finding] });
+  assert.equal(summaryOutput(run).next.action, 'implement');
+  assert.match(summaryOutput(run, false), /code major value.txt:1/);
+  run = await verify(run.run);
+  const minor = { severity: 'minor', location: 'value.txt:1', issue: 'Optional polish' };
+  run = await submitReview(run.run, jsonFile(run.run, 'summary-approved-code.json', codeReview(run, { findings: [minor] })));
+  assert.deepEqual(summaryOutput(run).findings, { plan: [], code: [minor] });
+});
+test('summary retains timeout and executable error details', async t => {
+  for (const timeout of [true, false]) {
+    const f = fixture(t); const config = readJSON(join(f.repo, '.factory.json'));
+    config.checks[0] = { name: timeout ? 'timeout' : 'missing', argv: timeout ? [process.execPath, '-e', 'setInterval(()=>{},100)'] : ['/not/a/real/program'], timeoutMs: 100 };
+    atomicJSON(join(f.repo, '.factory.json'), config); git(f.repo, ['add', '.factory.json']); git(f.repo, ['commit', '-m', 'diagnostic check']);
+    const run = await planned(f); const failed = await verify(run.run);
+    const result = summaryOutput(failed).checks[0].result;
+    assert.deepEqual(result, readRun(run.run).verification.results[0]);
+    if (timeout) assert.equal(result.exitCode, null); else assert.notEqual(result.exitCode, 0);
+    assert.equal(result.timedOut, timeout);
+    const human = summaryOutput(failed, false);
+    if (timeout) assert.match(human, /timeout/); else assert.ok(human.includes(result.error));
+  }
+});
+test('summary supports wait, interrupted start, blocked and completed lifecycle without mutation', async t => {
+  const f = fixture(t); let run = await start(f.opts);
+  await locked(run.run, async () => {
+    const output = summaryOutput(run); assert.equal(output.next.action, 'wait');
+    assert.equal(output.next.owner.pid, process.pid); assert.equal(output.next.owner.host, hostname());
+  });
+  const synthetic = readRun(run.run); synthetic.phase = 'preparing'; atomicJSON(join(run.run, 'state.json'), synthetic);
+  assert.equal(summaryOutput(run).next.action, 'resume');
+  run = await resume(run.run);
+  // Re-use this owned run through the normal helper's idempotent intake.
+  run = await planned(f); await verify(run.run); await verify(run.run); run = await verify(run.run);
+  assert.deepEqual(summaryOutput(run).next, { action: 'blocked', reason: 'Repair limit reached.', failures: 3, limit: 3 });
+  await extend(run.run, 1, 'Synthetic test authorizes repair');
+  writeFileSync(join(run.worktree, 'value.txt'), 'new\n'); run = await verify(run.run);
+  run = await submitReview(run.run, jsonFile(run.run, 'summary-final-review.json', codeReview(run)));
+  run = await deliver(run.run);
+  const output = summaryOutput(run);
+  assert.equal(output.phase, 'done'); assert.deepEqual(output.delivery, run.delivery);
+  assert.equal(output.next.action, 'done'); assert.equal(output.next.receipt, join(run.run, 'delivery.json'));
+  const human = summaryOutput(run, false); assert.ok(human.includes(run.delivery.commit)); assert.match(human, /Delivery: local/);
+});
+test('summary shows pending PR receipt during delivery recovery and exact completed draft receipt', async t => {
+  const f = fixture(t, { endpoint: 'draft-pr' }); const file = githubFixture(t, f);
+  let run = await reviewed(f); process.env.MOCK_FAIL = '1'; await assert.rejects(deliver(run.run)); delete process.env.MOCK_FAIL;
+  const partial = summaryOutput(run), state = readRun(run.run);
+  assert.deepEqual(partial.delivery, state.delivery); assert.ok(partial.delivery.commit); assert.equal(partial.delivery.pr, undefined);
+  assert.equal(partial.next.action, 'deliver'); assert.equal(partial.next.reason, 'Reconcile interrupted delivery.');
+  assert.match(summaryOutput(run, false), /PR: pending/);
+  assert.ok(existsSync(file)); run = await deliver(run.run);
+  const complete = summaryOutput(run); assert.deepEqual(complete.delivery, run.delivery);
+  assert.ok(summaryOutput(run, false).includes(run.delivery.pr)); assert.equal(complete.next.action, 'done');
 });
