@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "endpoint": "draft-pr",
-  "checks": [
-    { "name": "tests", "argv": ["npm", "test"], "timeoutMs": 120000 },
-    { "name": "source", "argv": ["npm", "run", "check"], "timeoutMs": 30000 }
-  ]
-}
