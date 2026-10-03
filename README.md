@@ -21,39 +21,63 @@ releasing are separate decisions.
 
 ## Get started
 
-Requires Node 22+, Git, macOS/Linux, and `gh` authenticated for GitHub delivery.
-Install from the source (there is no published npm release yet):
+Requires Python 3.11+, Git, macOS/Linux, and `gh` authenticated for GitHub delivery.
+Install from source with [uv](https://docs.astral.sh/uv/guides/tools/) (no PyPI release yet):
 
 ```sh
 git clone https://github.com/natejswenson/software-factory.git
 cd software-factory
-npm install --global .
+uv tool install .
 factory --help
 ```
 
-Add the skill to your agent. Symlink the bundled directory so its code remains
-available; replace `/path/to/software-factory` with this checkout's real path:
+Add the bundled skill to your agent. `factory skill-path` locates it in the
+installed Python package:
 
 ```sh
 # Codex
 mkdir -p ~/.agents/skills
-ln -s /path/to/software-factory/skills/software-factory ~/.agents/skills/software-factory
+ln -sfn "$(factory skill-path)" ~/.agents/skills/software-factory
 
 # Claude Code
 mkdir -p ~/.claude/skills
-ln -s /path/to/software-factory/skills/software-factory ~/.claude/skills/software-factory
+ln -sfn "$(factory skill-path)" ~/.claude/skills/software-factory
 ```
 
 Then ask your agent: **“Use software-factory in this repo to fix [task]. Finish
 with verified changes and a draft PR.”** The skill drives the loop in your
 current session. The CLI prints the next action; it does not call a model itself.
 
+## Python installation and existing runs
+
+The runtime has no third-party dependencies. `uv tool install .` builds a standard
+wheel with setuptools in an isolated build environment. A pip alternative is:
+
+```sh
+python3 -m venv /path/to/factory-venv
+/path/to/factory-venv/bin/python -m pip install .
+/path/to/factory-venv/bin/factory --help
+```
+
+From a checkout, use `python3 -m software_factory` wherever examples say `factory`.
+No installation is needed for source development or the test suite.
+
+When replacing an earlier npm installation, uninstall that package explicitly
+(`npm uninstall --global @natejswenson/software-factory`), then install this Python
+version and reconnect the skill symlinks using `factory skill-path`. Keep the old
+runtime until active work has been reviewed if you prefer a gradual migration.
+Run directories, version-1 JSON receipts, context hashes and historical branch
+ownership are retained. No state migration or receipt editing is required.
+Existing tasks keep their original check argv: if a project's frozen checks use
+Node, that project still requires Node for those checks. The factory itself does
+not. `resume`, `summary` and delivery operate on the same saved run directory.
+
 ## Enroll a project once
 
 Select checks that actually establish the project's behavior:
 
 ```sh
-factory init --repo /path/to/app --check '["npm","test"]' --check '["npm","run","build"]'
+factory init --repo /path/to/app --check '["python3","-m","unittest","discover","-s","tests"]'
 ```
 
 `init` creates `.rules/factory.md`. Review and commit it on your selected base.
@@ -68,7 +92,7 @@ create `.rules/factory.md` with:
   "version": 1,
   "endpoint": "draft-pr",
   "checks": [
-    { "name": "tests", "argv": ["npm", "test"], "timeoutMs": 120000 }
+    { "name": "tests", "argv": ["python3", "-m", "unittest", "discover", "-s", "tests"], "timeoutMs": 120000 }
   ]
 }
 ```
@@ -140,6 +164,13 @@ and repeat `--criterion` for multiple outcomes. `--endpoint local` explicitly
 selects a clean verified commit. A named `--base feature/lower-layer` supports
 one dependent stack layer; automatic stack management is not included.
 
+New runs use `feature/<task-slug>-<id>`. Select a branch with
+`--branch feature/<name>`, `bug/<name>` or `issue/<name>` using lowercase words
+separated by hyphens. `factory rename --run <run> --branch feature/<name>`
+renames an owned task before delivery, records the intent and observed ownership,
+and clears verification/code review. Resume reconciles interrupted renames;
+collisions and changed ownership/HEAD are rejected.
+
 Runs and logs live under the repository's Git common-dir (`factory/runs`), not
 in source. Original dirty files are preserved. No branch/worktree is removed
 automatically. `recover --run <run>` clears dead operation and start-allocation
@@ -193,9 +224,9 @@ uses existing authorized memory/preview integrations when present.
 ## Development
 
 ```sh
-npm test
-npm run check
-npm pack --dry-run
+python3 scripts/verify.py tests
+python3 scripts/verify.py source
+uv build
 ```
 
 Integration tests use real Git repositories, worktrees and check processes;

@@ -1,61 +1,33 @@
-#!/usr/bin/env python3
-"""Run real project checks during the transition from Node to Python.
-
-The migration keeps these argv commands frozen in its factory run. This bridge
-checks the existing implementation until the Python implementation replaces it.
-"""
+"""Executable repository checks, shared by local development and factory runs."""
 
 import argparse
 import ast
-from pathlib import Path
-import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_project() -> int:
-    """Require and execute the suite for each implementation present."""
-    suites = 0
-    legacy = sorted((ROOT / "test").glob("*.test.mjs"))
-    if legacy:
-        suites += 1
-        result = subprocess.run(["node", "--test", *map(str, legacy)], cwd=ROOT)
-        if result.returncode:
-            return result.returncode
-    if (ROOT / "tests").is_dir():
-        sys.path.insert(0, str(ROOT))
-        suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
-        if not suite.countTestCases():
-            print("Python test discovery returned zero tests.", file=sys.stderr)
-            return 2
-        suites += 1
-        if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
-            return 1
-    if not suites:
-        print("No executable project tests found.", file=sys.stderr)
-        return 2
-    return 0
+    sys.path.insert(0, str(ROOT))
+    suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"), top_level_dir=str(ROOT))
+    if suite.countTestCases() == 0:
+        raise RuntimeError("No tests discovered.")
+    return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
 
 
 def check_source() -> int:
-    """Parse source without creating bytecode or changing the working tree."""
-    sources = []
-    for folder in ("bin", "lib", "scripts", "test", "tests", "software_factory"):
-        path = ROOT / folder
-        for source in sorted(path.rglob("*.py")):
-            ast.parse(source.read_bytes(), filename=str(source))
-            sources.append(source)
-        for source in sorted(path.glob("*.mjs")):
-            result = subprocess.run(["node", "--check", str(source)], cwd=ROOT)
-            if result.returncode:
-                return result.returncode
-            sources.append(source)
-    if not sources:
-        print("No project source found.", file=sys.stderr)
-        return 2
-    print(f"All {len(sources)} source files parse.")
+    if (ROOT / "package.json").exists() or any(ROOT.glob("**/*.mjs")):
+        raise RuntimeError("Node source or packaging remains in this Python repository.")
+    paths = sorted(
+        path for folder in ("software_factory", "scripts", "tests") for path in (ROOT / folder).rglob("*.py")
+    )
+    if not paths:
+        raise RuntimeError("No Python sources discovered.")
+    for path in paths:
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    print(f"{len(paths)} Python source files parse.")
     return 0
 
 
