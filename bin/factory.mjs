@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { init, start, describe, resume, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover, recoverAllocation } from '../lib/factory.mjs';
+import { init, start, describe, resume, taskRules, submitPlan, submitPlanReview, verify, submitReview, deliver, extend, recover, recoverAllocation } from '../lib/factory.mjs';
 import { readRun, listRuns } from '../lib/store.mjs';
 import { repository, FactoryError } from '../lib/git.mjs';
 import { summarize, formatSummary } from '../lib/summary.mjs';
@@ -16,6 +16,7 @@ const help = `Software Factory — take one task to verified delivery in your cu
   factory list --repo PATH
   factory status|next|resume --run PATH
   factory summary --run PATH [--json]
+  factory rules --run PATH [--json]
   factory plan|plan-review|review --run PATH --file PATH
   factory verify|deliver --run PATH
   factory recover --run PATH | --repo PATH
@@ -55,6 +56,7 @@ try {
     case 'list': result = listRuns(repository(required('repo')).common).map(r => ({ id: r.id, task: r.task.split('\n')[0], phase: r.phase, endpoint: r.endpoint, run: r.dir })); break;
     case 'status': case 'next': result = describe(readRun(run())); break;
     case 'summary': result = summarize(readRun(run())); break;
+    case 'rules': result = taskRules(readRun(run())); break;
     case 'resume': result = await resume(run()); break;
     case 'plan': result = await submitPlan(run(), required('file')); break;
     case 'plan-review': result = await submitPlanReview(run(), required('file')); break;
@@ -67,6 +69,9 @@ try {
   }
   if (json) console.log(JSON.stringify(result, null, action === 'summary' ? undefined : 2));
   else if (action === 'summary') console.log(formatSummary(result));
+  else if (action === 'rules') console.log(result.enabled
+    ? result.files.map(f => `# ${f.path}\n\n${f.content}`).join('\n\n') || 'No repository rules.'
+    : 'Legacy run: repository rules were not enabled at start.');
   else if (Array.isArray(result)) {
     console.log('TASK\tSTATE\tENDPOINT\tRUN');
     for (const r of result) console.log(`${r.task}\t${r.phase}\t${r.endpoint}\t${r.run}`);
