@@ -1,8 +1,8 @@
 # Software Factory
 
 Use Python for all net-new implementation and tooling. Prefer the standard library.
-The existing JavaScript runtime uses Node >=22 and built-in modules. macOS/Linux
-are the supported platforms.
+Python >=3.11 and macOS/Linux are supported. Use the standard setuptools build
+backend and keep the runtime dependency-free.
 Run `python3 scripts/verify.py tests` and `python3 scripts/verify.py source`
 before delivery. Preserve the rule that completed
 tasks require fresh executable verification, review and observed delivery.

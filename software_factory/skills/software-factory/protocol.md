@@ -40,7 +40,7 @@ Code review (`factory review --run ... --file ...`):
 Include every criterion exactly once. Findings are unresolved observations:
 
 ```json
-{ "severity": "major", "location": "lib/example.mjs:42", "issue": "Concrete failure and why it matters" }
+{ "severity": "major", "location": "software_factory/example.py:42", "issue": "Concrete failure and why it matters" }
 ```
 
 Severity is `blocking`, `major`, or `minor`. A passing review cannot contain

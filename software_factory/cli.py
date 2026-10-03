@@ -1,0 +1,190 @@
+"""The factory console entry point. No agent subprocesses or model calls."""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+from . import engine
+from .delivery import deliver
+from .errors import FactoryError
+from .git import repository
+from .store import list_runs, read_run
+from .summary import format_summary, summarize
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise FactoryError(message)
+
+
+def parser() -> Parser:
+    result = Parser(
+        description="Software Factory — take one task to verified delivery in your current agent session.",
+        epilog="Repeat --criterion and --check. Use --task-file for longer requests. No model calls or daemon.",
+    )
+    result.add_argument(
+        "command",
+        nargs="?",
+        default="help",
+        help="init, start, list, status, next, summary, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+    )
+    for option in (
+        "repo",
+        "run",
+        "task",
+        "task-file",
+        "issue",
+        "base",
+        "worktree-root",
+        "endpoint",
+        "branch",
+        "file",
+        "reason",
+    ):
+        result.add_argument(f"--{option}")
+    result.add_argument("--attempts", type=int)
+    for option in ("criterion", "check"):
+        result.add_argument(f"--{option}", action="append", default=[])
+    result.add_argument("--json", action="store_true")
+    return result
+
+
+def dispatch(args: argparse.Namespace) -> Any:
+    def required(key: str) -> Any:
+        value = getattr(args, key.replace("-", "_"))
+        if value is None or value == "":
+            raise FactoryError(f"Missing --{key}.")
+        return value
+
+    def run_path() -> str:
+        return str(Path(required("run")).resolve())
+
+    action = args.command
+    if action == "skill-path":
+        return str(Path(__file__).parent / "skills" / "software-factory")
+    if action == "init":
+        checks = [
+            {"name": f"check{i + 1}", "argv": json.loads(raw), "timeoutMs": 120000} for i, raw in enumerate(args.check)
+        ]
+        return engine.init(required("repo"), checks)
+    if action == "start":
+        if sum(value is not None for value in (args.task, args.task_file, args.issue)) != 1:
+            raise FactoryError("Choose exactly one of --task, --task-file or --issue.")
+        task = Path(args.task_file).read_text(encoding="utf-8") if args.task_file is not None else args.task
+        return engine.start(
+            engine.StartOptions(
+                repo=required("repo"),
+                task=task,
+                issue=args.issue,
+                criteria=args.criterion,
+                base=args.base,
+                endpoint=args.endpoint,
+                worktree_root=required("worktree-root"),
+                branch=args.branch,
+            )
+        )
+    if action == "list":
+        return [
+            {
+                "id": run["id"],
+                "task": run["task"].splitlines()[0],
+                "phase": run["phase"],
+                "endpoint": run["endpoint"],
+                "run": run["dir"],
+            }
+            for run in list_runs(repository(required("repo")).common)
+        ]
+    if action in ("status", "next"):
+        return engine.describe(read_run(run_path()))
+    if action == "summary":
+        return summarize(read_run(run_path()))
+    if action == "rules":
+        return engine.task_rules(read_run(run_path()))
+    if action == "recover":
+        return engine.recover(run_path()) if args.run else engine.recover_allocation(required("repo"))
+    if action == "extend":
+        return engine.extend(run_path(), required("attempts"), required("reason"))
+    if action == "rename":
+        return engine.rename_branch(run_path(), required("branch"))
+    functions = {"resume": engine.resume, "verify": engine.verify, "deliver": deliver}
+    if action in functions:
+        return functions[action](run_path())
+    submissions = {"plan": engine.submit_plan, "plan-review": engine.submit_plan_review, "review": engine.submit_review}
+    if action in submissions:
+        return submissions[action](run_path(), required("file"))
+    raise FactoryError(f"Unknown command: {action}. Use --help.")
+
+
+def format_output(action: str, result: Any) -> str:
+    if action == "skill-path":
+        return result
+    if action == "summary":
+        return format_summary(result)
+    if action == "rules":
+        if not result["enabled"]:
+            return "Legacy run: repository rules were not enabled at start."
+        return (
+            "\n\n".join(f"# {file['path']}\n\n{file['content']}" for file in result["files"]) or "No repository rules."
+        )
+    if isinstance(result, list):
+        return "TASK\tSTATE\tENDPOINT\tRUN\n" + "\n".join(
+            f"{run['task']}\t{run['phase']}\t{run['endpoint']}\t{run['run']}" for run in result
+        )
+    if isinstance(result, dict) and "id" in result:
+        lines = [
+            result["task"].splitlines()[0],
+            "",
+            f"State: {result['phase']}    Next: {result['next']['action']}    Endpoint: {result['endpoint']}",
+            f"Worktree: {result['worktree']}",
+            f"Run: {result['run']}",
+        ]
+        if result["next"].get("reason"):
+            lines.append(result["next"]["reason"])
+        for check in (result.get("verification") or {}).get("results", []):
+            lines.append(
+                f"Check {check['name']}: {'passed' if check['passed'] else 'failed'}{' (timeout)' if check['timedOut'] else ''}    Log: {check['log']}"
+            )
+        if result.get("delivery"):
+            lines.append(f"Commit: {result['delivery']['commit']}")
+            if result["delivery"].get("pr"):
+                lines.append(f"Draft PR: {result['delivery']['pr']}")
+        return "\n".join(lines)
+    return json.dumps(result, indent=2, ensure_ascii=True)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    json_output = "--json" in argv
+    try:
+        options = parser()
+        args = options.parse_args(argv)
+        if args.command == "help":
+            options.print_help()
+            return 0
+        result = dispatch(args)
+        print(
+            json.dumps(
+                result,
+                ensure_ascii=True,
+                separators=(",", ":") if args.command == "summary" else None,
+                indent=None if args.command == "summary" else 2,
+            )
+            if args.json
+            else format_output(args.command, result)
+        )
+        if isinstance(result, dict) and (
+            result.get("phase") == "blocked"
+            or (args.command == "verify" and (result.get("verification") or {}).get("passed") is False)
+        ):
+            return 2
+        return 0
+    except (FactoryError, OSError, ValueError) as error:
+        code = error.code if isinstance(error, FactoryError) else "invalid"
+        print(json.dumps({"error": str(error), "code": code}) if json_output else f"factory: {error}", file=sys.stderr)
+        return 3 if code == "infrastructure" else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -45,7 +45,7 @@ Examples: `feature/repo-rules`, `bug/rule-parsing`, `issue/42-rule-loading`.
 Write all net-new implementation and tooling in Python.
 Use Python tests for new Python behavior and add meaningful Python test commands
 to the factory checks when Python code is introduced.
-The existing JavaScript implementation remains subject to its current tests.
+Run the configured Python checks for every implementation change.
 
 ## Completion
 
