@@ -1,0 +1,66 @@
+# Execution designs
+
+This folder contains implementation specifications for Software Factory. Each
+design should give the executing agent enough context to investigate, plan,
+implement, verify and deliver the change without inventing product requirements.
+
+| Order | Design | Readiness | Dependency |
+|---|---|---|---|
+| 1 | [Repository structure cleanup](0001-repository-structure.md) | Ready for factory planning | None |
+| 2 | [PRD folder setup](0002-prd-folder-setup.md) | Ready for factory planning | Prefer design 0001 first; can run independently using current documentation paths |
+| 3 | [Task preflight](0003-task-preflight.md) | Ready for factory planning | None; [matching PRD](../prd/0003-task-preflight.md) |
+| 4 | [Evidence diagnostics](0004-evidence-diagnostics.md) | Ready for factory planning | None; [matching PRD](../prd/0004-evidence-diagnostics.md) |
+| 5 | [Review context bundles](0005-review-context-bundles.md) | Ready for factory planning | None; [matching PRD](../prd/0005-review-context-bundles.md) |
+| 6 | [Verification progress and logs](0006-verification-progress.md) | Ready for factory planning | None; [matching PRD](../prd/0006-verification-progress.md) |
+| 7 | [Run history and discovery](0007-run-history.md) | Ready for factory planning | None; [matching PRD](../prd/0007-run-history.md) |
+| 8 | [Pull request descriptions](0008-pull-request-descriptions.md) | Ready for factory planning | None; [matching PRD](../prd/0008-pull-request-descriptions.md) |
+
+“Ready” describes specification completeness. It does not mean implementation,
+plan approval, passing checks, review or delivery has happened. All changes are
+unimplemented when these designs are introduced. [The evidence review](improvement-evidence.md)
+documents the repository/run observations behind designs 0003–0008 and their
+recommended priority. Those pairs complement the active automation task rather
+than proposing a second CI/merge/release workflow.
+
+## Folder contract
+
+- Use stable names: `NNNN-short-description.md`. Keep completed designs at their
+  original paths; record observed delivery links when available.
+- Include the problem, inspected repository evidence, goals, scope, decisions,
+  exact file changes, interfaces, compatibility, failure cases, implementation
+  sequence, acceptance criteria, verification and delivery requirements.
+- Resolve consequential choices before declaring a design ready. Explain which
+  behavior is current and which is proposed. Use portable example paths.
+- Keep verification receipts, reviews, logs and task state in the factory's
+  private run directory. Link to observed outcomes; do not copy runtime artifacts
+  or personal paths into source.
+- A design is task input. The executing agent still creates a run-specific plan
+  and obtains its review using the installed factory protocol.
+
+## Execute a design
+
+Read the selected design and current repository instructions. Ensure the selected
+base contains the intended prerequisites and committed factory configuration.
+Start one factory run for one design, copying **every** numbered acceptance
+criterion from the design into a separate `--criterion` argument. For example:
+
+```sh
+factory start --repo /path/to/software-factory \
+  --task-file /path/to/software-factory/design/0001-repository-structure.md \
+  --criterion "Copy AC1's complete text here" \
+  --criterion "Repeat for every remaining acceptance criterion" \
+  --base main --branch feature/repository-structure \
+  --worktree-root /path/to/approved/worktrees --json
+```
+
+Replace the example criteria; do not submit the placeholders. From this checkout,
+`python3 -m software_factory` can replace `factory`. Follow `next --json` through
+plan review, implementation, executable verification, code review and delivery.
+Use an explicitly selected lower branch for a dependent stack, or execute design
+0002 after design 0001 is available on `main`. Draft PRs target the selected base.
+Merging, releasing and removing worktrees require separate authorization.
+
+`design/` answers **how a change will be built**. [prd/](../prd/README.md) answers
+**what users need and what success means**. The six new pairs are hand-authored;
+the packaged folder-setup workflow in design 0002 is still proposed. Neither
+folder replaces `.rules/` or the private factory run artifacts.

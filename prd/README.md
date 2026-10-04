@@ -1,0 +1,33 @@
+# Product requirements
+
+These six PRDs were authored after reviewing the current Python implementation
+and four saved Software Factory runs. They describe proposed improvements;
+none is implemented or delivered by adding these documents.
+
+| Priority | PRD | Execution design |
+|---|---|---|
+| 1 | [0003 — Task preflight](0003-task-preflight.md) | [Design](../design/0003-task-preflight.md) |
+| 1 | [0004 — Evidence diagnostics](0004-evidence-diagnostics.md) | [Design](../design/0004-evidence-diagnostics.md) |
+| 1 | [0005 — Review context bundles](0005-review-context-bundles.md) | [Design](../design/0005-review-context-bundles.md) |
+| 2 | [0006 — Verification progress and logs](0006-verification-progress.md) | [Design](../design/0006-verification-progress.md) |
+| 2 | [0007 — Run history and discovery](0007-run-history.md) | [Design](../design/0007-run-history.md) |
+| 2 | [0008 — Pull request descriptions](0008-pull-request-descriptions.md) | [Design](../design/0008-pull-request-descriptions.md) |
+
+IDs align with the execution designs; 0001 and 0002 remain the earlier repository
+cleanup and PRD setup designs. [The evidence review](../design/improvement-evidence.md)
+explains the selection and distinguishes observations from inferred opportunities.
+
+`ready` means the requirement choices are resolved enough for factory planning.
+It does not confer plan approval or establish passing checks, review or delivery.
+Each PRD has a matching design and the same acceptance criteria. Execute one pair
+as one task, supplying the complete selected PRD via `--task-file`, every
+criterion via its own `--criterion`, and the matching design to the planning
+agent. Include the design's implementation contract in the reviewed private plan;
+task-file intake does not recursively load links. Follow the existing factory
+review, verification and observed draft-delivery loop.
+
+These are hand-authored project requirements. Creating this folder does not
+implement the packaged generator or `prd-init` proposed in design 0002. That
+future command must preserve this README and existing PRDs when run here.
+Do not auto-start a backlog or overwrite these specifications. Keep private run
+records, host paths, logs and review receipts outside source.
