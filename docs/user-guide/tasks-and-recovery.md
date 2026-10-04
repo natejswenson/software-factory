@@ -71,3 +71,32 @@ Human lifecycle labels draft/ready/in-progress/delivered are not enforced states
 In-progress requires an actual run; delivered requires observed endpoint evidence.
 Only update labels when requested/included in reviewed work before final checks;
 record post-delivery links through a subsequent reviewed change. Do not auto-run PRDs.
+
+## Optional task preflight
+
+```sh
+factory preflight --repo /path/to/app --base main \
+  --branch feature/example --worktree-root /path/to/approved/worktrees --json
+```
+
+Inspect readiness before allocation: Git/base/index, committed settings/rules,
+branch collision, private run allocation path, worktree parent and configured
+executables. No directories, files, locks, branch, worktree or run are created;
+no checks, interpreter imports or network/auth queries run. Unrelated dirt is
+allowed; required settings must match the committed base. Relative executable
+existence/mode comes from that base, not unrelated dirty source.
+
+The report separates start and delivery probes with pass/fail/unknown statuses and
+remedies. JSON version1 returns repo/baseRef/base/endpoint, ready/deliveryReady,
+checks (name/scope/status/message/remedy) and limitations. Exit0 means locally
+start-ready, even with a delivery-only blocker; exit2 means invalid/known start
+blocker, and exit3 means required observations unavailable through infrastructure.
+Missing flags retain the usual error JSON. Unresolved values are null.
+
+For a draft PR, only gh/origin/named-base availability is inspected; origin URL
+values are withheld. Authentication, access, remote branches and PR eligibility
+remain unknown offline. A local endpoint's delivery readiness describes local
+prerequisites only. Access is advisory; host policy and actual worktree creation
+are authoritative. Duplicate runs, allocation locks and task-derived branches
+are not certified or reserved. Normal start/delivery revalidate all their gates.
+A passing report does not establish executable verification or task completion.

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import engine
+from . import engine, preflight
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
@@ -28,7 +28,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, start, list, status, next, summary, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, start, list, status, next, summary, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -71,6 +71,10 @@ def dispatch(args: argparse.Namespace) -> Any:
         return engine.init(required("repo"), checks)
     if action == "prd-init":
         return engine.prd_init(required("repo"))
+    if action == "preflight":
+        return preflight.inspect(
+            required("repo"), required("worktree-root"), base=args.base, branch=args.branch, endpoint=args.endpoint
+        )
     if action == "start":
         if sum(value is not None for value in (args.task, args.task_file, args.issue)) != 1:
             raise FactoryError("Choose exactly one of --task, --task-file or --issue.")
@@ -122,6 +126,8 @@ def dispatch(args: argparse.Namespace) -> Any:
 def format_output(action: str, result: Any) -> str:
     if action == "skill-path":
         return result
+    if action == "preflight":
+        return preflight.format_report(result)
     if action == "prd-init":
         return "\n".join(
             [
@@ -185,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.json
             else format_output(args.command, result)
         )
+        if args.command == "preflight":
+            return preflight.exit_code(result)
         if isinstance(result, dict) and (
             result.get("phase") == "blocked"
             or (args.command == "verify" and (result.get("verification") or {}).get("passed") is False)

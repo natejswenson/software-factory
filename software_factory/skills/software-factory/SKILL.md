@@ -54,6 +54,15 @@ with `init --repo <repo> --check '["python3","-m","unittest","discover","-s","te
 and review/commit that Markdown configuration and generated PRD scaffold before starting. At least one meaningful
 check is required. Never invent a successful check to bypass the gate.
 
+Optional preparation: `preflight --repo <repo> --worktree-root <approved-root>
+--base main --branch feature/<name> --json` reports local prerequisites without
+allocating a run, writing files, executing checks or querying the network. It
+checks the private allocation path as well as the proposed worktree parent.
+Access/tool presence is advisory; no branch/path/lock is reserved. Resolve blockers
+and start normally; every original gate is revalidated. Draft remote readiness
+remains unknown offline unless a local delivery prerequisite is missing. A passing
+preflight is not verification, review, delivery or authority to bypass them.
+
 Persist explicit acceptance criteria. Select the repository's required base and
 an actual host-approved writable worktree root. Start with:
 
