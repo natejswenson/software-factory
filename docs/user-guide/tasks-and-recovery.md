@@ -53,3 +53,21 @@ Each configured check contains its exact `result`, or `null` when unrun.
 without review context or Git evidence. `delivery` is the exact current receipt
 or `null`. Strings and result values are preserved; full evidence is available
 through `status --json`. Like status, a blocked run returns exit code 2.
+
+## Ready PRDs
+
+Copy `prd/_template.md` to `NNNN-short-description.md`. Cover all sections,
+observable criteria and concrete checks; resolve consequential choices and remove
+placeholders. Use N/A with reasons. Ready requirements are self-contained; links
+are context, not recursively loaded task text. PRDs explain what/why, designs how,
+and .rules remains settings/instructions. Review/commit the ready PRD on the base.
+
+Pass full text via `--task-file` and each complete criterion via separate literal
+`--criterion` flags, in order. The generated PRD README includes a complete synthetic
+example. The normal reviewed plan/checks/code review/observed delivery loop applies.
+Resume the same run: source edits cannot alter frozen task text/criteria. Consequential
+changes need user direction and a separately planned replacement, never state edits.
+Human lifecycle labels draft/ready/in-progress/delivered are not enforced states.
+In-progress requires an actual run; delivered requires observed endpoint evidence.
+Only update labels when requested/included in reviewed work before final checks;
+record post-delivery links through a subsequent reviewed change. Do not auto-run PRDs.

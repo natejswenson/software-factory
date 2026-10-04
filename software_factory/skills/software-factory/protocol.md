@@ -49,3 +49,13 @@ do not erase a finding to manufacture a pass. Rejected plan/code reviews and
 failed verification each consume one of three repair attempts by default.
 Infrastructure failures do not consume that budget. Historical artifacts remain
 available after repairs. Hashes establish freshness, not reviewer truth.
+
+## PRD task text
+
+A ready PRD uses the existing task-file interface: freeze the complete text and
+supply every full acceptance criterion explicitly, in order, retaining labels.
+Linked files are not recursively frozen; incorporate required constraints into
+self-contained requirements and necessary design details into the reviewed plan.
+Source edits do not replace saved text/criteria; resume the same run. Human PRD
+lifecycle labels do not change gates or these exact review schemas. No automatic
+criteria parser, approval, commit or backlog execution is implied.

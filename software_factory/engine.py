@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from . import prd
 from .checks import execute_check, validate_config
 from .errors import FactoryError
 from .git import assert_supported, assert_worktree, command, git, repository, snapshot
@@ -38,21 +39,40 @@ def nonempty(value: Any, name: str) -> str:
     return value.strip()
 
 
-def init(repo: str, checks: list[dict[str, Any]]) -> dict[str, str]:
+def init(repo: str, checks: list[dict[str, Any]]) -> dict[str, Any]:
     root = Path(repository(repo).root)
     rules = read_rules(root)
     if (root / ".factory.json").exists() or settings(rules):
-        raise FactoryError("Factory configuration already exists; inspect it before editing.")
+        raise FactoryError("Factory configuration already exists; use prd-init for scaffold setup.")
     config = validate_config({"version": 1, "endpoint": "draft-pr", "checks": checks})
     path = root / ".rules" / "factory.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as stream:
-        stream.write(
-            "# Software Factory\n\n```factory-config\n"
-            + json.dumps(config, indent=2)
-            + "\n```\n\n## Repository instructions\n\nDescribe this repository's conventions and completion requirements here.\n"
-        )
-    return {"config": str(path), "next": "Review and commit .rules/factory.md, then start a task."}
+    if path.exists() or path.is_symlink():
+        raise FactoryError(".rules/factory.md already exists; inspect it before editing. Use prd-init for scaffold setup.")
+    scaffold = prd.prepare(root)
+    created: list[str] = []
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stream = path.open("x", encoding="utf-8")
+        created.append(".rules/factory.md")
+        with stream:
+            stream.write(
+                "# Software Factory\n\n```factory-config\n"
+                + json.dumps(config, indent=2)
+                + "\n```\n\n## Repository instructions\n\nDescribe this repository's conventions and completion requirements here.\n"
+            )
+    except OSError as error:
+        code = "invalid" if isinstance(error, FileExistsError) else "infrastructure"
+        raise FactoryError(prd.partial_message(error, created, []), code) from error
+    result = prd.create(scaffold, prior_created=created)
+    return {
+        "config": str(path),
+        "prd": result,
+        "next": "Review and commit .rules/factory.md and the PRD scaffold, then start a task.",
+    }
+
+
+def prd_init(repo: str) -> dict[str, Any]:
+    return prd.create(prd.prepare(Path(repository(repo).root)))
 
 
 @dataclass(frozen=True)

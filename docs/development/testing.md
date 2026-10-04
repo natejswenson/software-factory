@@ -93,3 +93,13 @@ Python. Resume preserved state bytes; identity/config hashes and the approved
 plan review remained unchanged. No receipt edits were used. The actual migration
 task was also created and plan-reviewed in Node, then resumed and ledger-renamed
 in Python. Live task evidence stays in the private run directory.
+
+## PRD scaffolding
+
+`tests/test_prd.py` exercises actual Git roots/linked worktrees, additive CLI output,
+custom-byte preservation, unsafe-path/resource preflight, exclusive-create races and
+partial open/write/close failures. Enrollment retains original settings validation.
+The lifecycle test freezes full PRD text and multiple explicit criteria, deduplicates,
+resumes after source edits and completes a synthetic-reviewed real local lifecycle.
+Installed smoke asserts enrollment, standalone existing-project setup and repeats
+outside the source tree without Node/npm, using packaged scaffold resources.

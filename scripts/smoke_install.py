@@ -44,7 +44,21 @@ def main() -> int:
         run(["git", "config", "commit.gpgsign", "false"], repo)
         (repo / "check.py").write_text("from pathlib import Path\nassert Path('value.txt').read_text() == 'new\\n'\n")
         (repo / "value.txt").write_text("old\n")
-        cli("init", "--repo", repo, "--check", '["python3", "check.py"]')
+        enrolled = cli("init", "--repo", repo, "--check", '["python3", "check.py"]')
+        assert enrolled["prd"]["created"] == ["prd/README.md", "prd/_template.md"]
+        assert "Status: draft" in (repo / "prd/_template.md").read_text()
+        custom = b"Synthetic customized requirement guidance\n"
+        (repo / "prd/README.md").write_bytes(custom)
+        repeated = cli("prd-init", "--repo", repo)
+        assert repeated["created"] == [] and repeated["skipped"] == ["prd/README.md", "prd/_template.md"]
+        assert (repo / "prd/README.md").read_bytes() == custom
+        retrofit = root / "existing project"
+        retrofit.mkdir()
+        run(["git", "init", "-b", "main"], retrofit)
+        standalone = cli("prd-init", "--repo", retrofit)
+        assert standalone["created"] == ["prd/README.md", "prd/_template.md"]
+        assert not (retrofit / ".rules").exists() and not (retrofit / ".factory.json").exists()
+        assert cli("prd-init", "--repo", retrofit)["created"] == []
         run(["git", "add", "."], repo)
         run(["git", "commit", "-m", "synthetic installation baseline"], repo)
         status = cli(
