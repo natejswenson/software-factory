@@ -100,3 +100,34 @@ prerequisites only. Access is advisory; host policy and actual worktree creation
 are authoritative. Duplicate runs, allocation locks and task-derived branches
 are not certified or reserved. Normal start/delivery revalidate all their gates.
 A passing report does not establish executable verification or task completion.
+
+
+## Explain task evidence
+
+```sh
+factory explain --run /path/to/run --json
+```
+
+Each plan review, verification and code review is missing, failed, stale, current,
+or unknown. Historical verdicts/results are separate from current freshness;
+failed proof remains failed even when its inputs also changed. Differences show
+recorded/current fingerprint values. The next action comes from the task engine.
+Changed paths compare the latest verification tree to current files, falling back
+to code review only without a verification tree. They are edits since that proof,
+including deletions, executable modes and symlinks, rather than the whole feature.
+Baseline/current tree and HEAD hashes are included. Missing objects or malformed
+rules produce partial unknown/error results, never guessed unchanged files.
+
+An engine-owned delivery commit may change HEAD while allowing delivery recovery:
+`deliveryRecoveryAllowed` reports that exception without calling the old proof
+identical. Recorded completed delivery stays historical; no remote query runs.
+Rules path detail is labeled **initial**, not the content at the last review.
+Ignored dependencies/host services remain outside the existing fingerprint.
+
+No lock is acquired or recovered. Under another owner's lock, the command reports
+wait and historical facts without inspecting current files. Changes during capture
+produce `snapshot-changed`; rerun after files stabilize. Explain preserves state,
+receipts, source/index/HEAD and existing summary output. Exit0 is a complete report
+including stale/failed proof, exit2 is invalid input or a blocked run, and exit3 is
+partial inspection. An explanation does not repair a gate; follow the next action
+and obtain fresh checks/review as required.

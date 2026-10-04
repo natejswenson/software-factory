@@ -113,3 +113,14 @@ settings drift, conflicts/submodules, branch collisions, allocation parent files
 selected-base executables, missing tools and credential-bearing synthetic origins.
 Injected observation errors distinguish unavailable infrastructure from known
 blockers. Installed smoke exercises local preflight without creating its root.
+
+
+## Evidence diagnostics
+
+`tests/test_diagnostics.py` uses real snapshot trees for modes, symlinks,
+deletions, rename-as-delete/add and tracked ignored edits since verification.
+It checks every fingerprint dimension, failed/historical proof, legacy rules,
+owned delivery recovery, unavailable objects/worktrees, malformed rules/receipts,
+live operation locks and edits during inspection. State, receipt, index, HEAD
+and source bytes are compared. Summary tests retain exact historical projections;
+installed smoke checks current explanation and terminal historical delivery.

@@ -60,6 +60,8 @@ current session; the CLI prints the next action and does not call a model itself
 Optional `factory preflight --repo /path/to/app --worktree-root /path/to/approved/worktrees`
 reports local readiness without starting a task. Actual start/check/review/delivery
 gates still apply; remote readiness remains unverified offline.
+Use `factory explain --run /path/to/run` to see which proof became stale and
+which files changed since the saved verification.
 
 ## Read more
 
