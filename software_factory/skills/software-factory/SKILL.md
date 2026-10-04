@@ -17,6 +17,32 @@ bundled skill for agent symlinks. From a source checkout, use
 needed. Existing saved tasks retain their original executable checks.
 Read [protocol.md](protocol.md) when producing plan or review artifacts.
 
+## PRD authoring and intake
+
+New `init` enrollment creates settings plus `prd/README.md` and `_template.md`.
+For existing Git projects, use `prd-init --repo <repo>`; it creates only missing
+scaffold files, preserving customized regular files. Review/commit intended files.
+Partial errors identify potentially incomplete created files: inspect/repair their
+content yourself; rerun fills only missing files and never overwrites existing ones.
+
+When asked to author a PRD, use the template's complete sections, observable
+criteria and concrete checks. Resolve consequential choices and remove placeholders
+before marking ready. Labels draft/ready/in-progress/delivered are human guidance,
+not CLI states; delivered needs an observed endpoint link. Requirements must be
+self-contained: read links and incorporate necessary constraints because task-file
+intake does not recursively load links. PRDs explain what/why, designs explain how,
+.rules holds settings/instructions, and private plans/reviews/receipts stay private.
+
+Review/commit a ready PRD on the intended base before dependent work. Pass its full
+text with `--task-file` and every full criterion as separate `--criterion` flags
+in document order, retaining labels/meaning. Do not assume automatic extraction,
+approval, lifecycle validation or commit. Put necessary linked design details in
+the reviewed plan; follow the same review/check/delivery gates. Resume the same run:
+source PRD edits cannot change frozen task/criteria. Consequential changes require
+user direction and a separately planned replacement, never saved-state edits.
+Update lifecycle only when requested/included in reviewed work before final checks;
+use a subsequent reviewed change for post-delivery links. Do not auto-start a backlog.
+
 ## Start or resume
 
 Use the given repo/task immediately. Investigate repository instructions and
@@ -25,7 +51,7 @@ choices. Inspect `.rules/*.md` for instructions and fenced `factory-config` JSON
 settings; `.factory.json` remains a compatible baseline. If settings are absent,
 configure actual project checks
 with `init --repo <repo> --check '["python3","-m","unittest","discover","-s","tests"]'`, adapt argv to the project,
-and review/commit that Markdown configuration before starting. At least one meaningful
+and review/commit that Markdown configuration and generated PRD scaffold before starting. At least one meaningful
 check is required. Never invent a successful check to bypass the gate.
 
 Persist explicit acceptance criteria. Select the repository's required base and

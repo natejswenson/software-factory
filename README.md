@@ -51,7 +51,8 @@ Enroll your project with a meaningful check:
 factory init --repo /path/to/app --check '["python3","-m","unittest","discover","-s","tests"]'
 ```
 
-Review and commit the generated `.rules/factory.md` on your selected base. Then
+Review and commit the generated `.rules/factory.md` and `prd/` scaffold on your
+selected base. Existing projects can use `factory prd-init --repo /path/to/app`. Then
 ask your coding agent: **“Use software-factory in this repo to fix [task]. Finish
 with verified changes and a draft PR.”** The skill drives the loop in your
 current session; the CLI prints the next action and does not call a model itself.

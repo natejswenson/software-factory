@@ -23,6 +23,8 @@ class RulesTests(FactoryCase):
         checks = [{"name": "behavior", "argv": [sys.executable, "check.py"], "timeoutMs": 2000}]
         initialized = engine.init(str(f.repo), checks)
         self.assertEqual(initialized["config"], str(f.repo / ".rules" / "factory.md"))
+        self.assertEqual(initialized["prd"]["created"], ["prd/README.md", "prd/_template.md"])
+        self.assertIn("Status: draft", (f.repo / "prd/_template.md").read_text())
         self.assertEqual(read_project(f.repo)["config"]["checks"], checks)
         self.assertIn("built-in modules", (f.repo / ".rules" / "conventions.md").read_text())
         with self.assertRaisesRegex(FactoryError, "already exists"):

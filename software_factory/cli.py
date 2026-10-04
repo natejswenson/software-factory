@@ -28,7 +28,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, start, list, status, next, summary, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, start, list, status, next, summary, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -69,6 +69,8 @@ def dispatch(args: argparse.Namespace) -> Any:
             {"name": f"check{i + 1}", "argv": json.loads(raw), "timeoutMs": 120000} for i, raw in enumerate(args.check)
         ]
         return engine.init(required("repo"), checks)
+    if action == "prd-init":
+        return engine.prd_init(required("repo"))
     if action == "start":
         if sum(value is not None for value in (args.task, args.task_file, args.issue)) != 1:
             raise FactoryError("Choose exactly one of --task, --task-file or --issue.")
@@ -120,6 +122,15 @@ def dispatch(args: argparse.Namespace) -> Any:
 def format_output(action: str, result: Any) -> str:
     if action == "skill-path":
         return result
+    if action == "prd-init":
+        return "\n".join(
+            [
+                f"PRD folder: {result['prd']}",
+                *[f"Created: {path}" for path in result["created"]],
+                *[f"Skipped: {path}" for path in result["skipped"]],
+                result["next"],
+            ]
+        )
     if action == "summary":
         return format_summary(result)
     if action == "rules":

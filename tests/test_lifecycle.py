@@ -1,5 +1,6 @@
 """Behavioral parity for intake, evidence gates and interruption recovery."""
 
+import json
 import os
 import shutil
 import socket
@@ -393,3 +394,37 @@ class LifecycleTests(FactoryCase):
         atomic_json(allocation / "lock" / "owner.json", {"pid": 2147483647, "host": socket.gethostname()})
         self.assertTrue(engine.recover(run["run"])["allocation"]["recovered"])
         self.assertNotEqual(engine.start(replace(f.options, task="Another task"))["id"], run["id"])
+
+    def test_prd_file_freezes_full_text_criteria_dedup_and_resume_gates(self):
+        f = self.fixture()
+        prd = f.repo / "prd/0001-example.md"
+        prd.parent.mkdir()
+        text = "# Synthetic requirement\nStatus: ready\nFull requirements stay frozen.\n"
+        prd.write_text(text)
+        git(f.repo, ["add", "--", "prd"])
+        git(f.repo, ["commit", "-m", "synthetic ready PRD"])
+        args = ["start", "--repo", f.repo, "--task-file", prd, "--criterion", "AC1: value.txt contains new", "--criterion", "AC2: check exits zero", "--worktree-root", f.options.worktree_root, "--json"]
+        first = self.cli(*args)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        run = json.loads(first.stdout)
+        self.assertEqual(json.loads(self.cli(*args).stdout)["id"], run["id"])
+        self.assertEqual(run["task"], text.strip())
+        self.assertEqual([item["text"] for item in run["criteria"]], ["AC1: value.txt contains new", "AC2: check exits zero"])
+        frozen = (Path(run["run"]) / "task.md").read_bytes()
+        prd.write_text("# Changed original source requirement\n")
+        self.assertEqual(engine.resume(run["run"])["task"], text.strip())
+        self.assertEqual((Path(run["run"]) / "task.md").read_bytes(), frozen)
+        with self.assertRaisesRegex(FactoryError, "plan review"):
+            engine.verify(run["run"])
+        plan = Path(run["run"]) / "plan.md"
+        plan.write_text("# Synthetic plan\nChange value and check both criteria.\n")
+        engine.submit_plan(run["run"], plan)
+        self.approve_plan(run)
+        (Path(run["worktree"]) / "value.txt").write_text("new\n")
+        checked = engine.verify(run["run"])
+        with self.assertRaisesRegex(FactoryError, "code review"):
+            deliver(run["run"])
+        review = self.code_review(checked, criteria=[{"id": item["id"], "passed": True, "evidence": "Synthetic fixture actual check passed"} for item in run["criteria"]])
+        engine.submit_review(run["run"], self.json_file(run["run"], "synthetic-prd-review.json", review))
+        self.assertEqual(deliver(run["run"])["phase"], "done")
+        self.assertEqual(prd.read_text(), "# Changed original source requirement\n")
