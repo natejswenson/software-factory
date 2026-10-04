@@ -166,3 +166,20 @@ source/index/HEAD, locks and worktree inventory. Legacy list and strict allocati
 still reject malformed ledgers. The read-only captured-plan adapter uses a sentinel
 for explicit absence; mutation gates retain live plan reads. Installed smoke uses
 both commands and compares retained verification details.
+
+## PR presentation and CI regressions
+
+`tests/test_pr_description.py` uses real verified repositories and a synthetic GitHub
+adapter that records literal title/body-file contents. It asserts exact evidence paths,
+verbatim multiline criteria, Unicode/Markdown, private command withholding, input/body
+bounds and file safety, no-op previews, interrupted metadata publication, immutable
+commit/body selection and owned-commit recovery. Failed pushes, uncertain creates,
+existing metadata, wrong head/base/state and ambiguous PRs stay explicit. No-input
+delivery retains the exact old title/body/intent, including bodies beyond the custom
+limit. Installed smoke submits a preview and retains its hash through local delivery.
+
+Process tests inject cleanup permission failures and assert that the primary interrupt
+and separate cleanup diagnostics survive; cleanup-only errors still fail. Existing real
+process-group and restored-handler assertions remain. Disposable test repositories
+disable automatic Git maintenance/GC before their first commit, preventing background
+maintenance locks from racing strict file snapshots; preflight byte assertions remain.

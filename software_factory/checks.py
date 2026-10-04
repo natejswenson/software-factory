@@ -64,6 +64,7 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
     }
     child: subprocess.Popen[bytes] | None = None
     handlers = {}
+
     group_killed = False
     signalling = False
     kill_requested = False

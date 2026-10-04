@@ -70,6 +70,12 @@ bounded log tail. These observations do not replace verification or review.
 Use `factory runs --repo /path/to/app` to find a saved task and
 `factory history --run /path/to/run` to inspect its recorded events and check attempts.
 
+For a concise PR, author a private description JSON using current verified evidence,
+then run `factory pr-description --run /path/to/run --file /path/to/description.json`.
+Inspect the full preview and include it in code review. The factory generates criteria
+and check details; your summary remains attributed prose. Delivery retains the chosen
+description through retries. [Description fields and recovery](docs/user-guide/tasks-and-recovery.md#concise-pr-descriptions).
+
 ## Read more
 
 - [Project setup](docs/user-guide/project-setup.md): settings, repository rules and compatibility.
