@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import diagnostics, engine, history, preflight, progress, review_context
+from . import diagnostics, engine, history, pr_description, preflight, progress, review_context
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
@@ -28,7 +28,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, preflight, start, list, runs, history, status, next, summary, explain, review-context, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, start, list, runs, history, status, next, summary, explain, review-context, pr-description, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -100,6 +100,8 @@ def dispatch(args: argparse.Namespace) -> Any:
         )
     if action == "runs":
         return history.discover(required("repo"), phase=args.phase, limit=20 if args.limit is None else args.limit)
+    if action == "pr-description":
+        return pr_description.submit(run_path(), required("file"))
     if action == "history":
         return history.inspect(
             str(Path(required("run")).absolute()), offset=args.offset, limit=100 if args.limit is None else args.limit
@@ -154,6 +156,8 @@ def dispatch(args: argparse.Namespace) -> Any:
 
 
 def format_output(action: str, result: Any) -> str:
+    if action == "pr-description":
+        return pr_description.format_preview(result)
     if action == "skill-path":
         return result
     if action == "preflight":

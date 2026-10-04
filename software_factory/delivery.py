@@ -5,6 +5,7 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from . import pr_description
 from .engine import (
     EVIDENCE_KEYS,
     active,
@@ -58,9 +59,13 @@ def _find_pr(run: Run, target: dict[str, Any]) -> dict[str, Any] | None:
     return prs[0] if prs else None
 
 
-def _commit(run: Run, current: dict[str, Any], recovering: bool) -> dict[str, Any]:
+def _commit(
+    run: Run, current: dict[str, Any], recovering: bool, *, presentation_hash: str | None = None
+) -> dict[str, Any]:
     if not run.get("commitIntent"):
         run["commitIntent"] = {"parent": current["head"], "tree": current["tree"], "paths": current["paths"]}
+        if presentation_hash is not None:
+            run["commitIntent"]["presentationHash"] = presentation_hash
         save(run, "commit-intent")
     if not recovering and not (run.get("delivery") or {}).get("commit"):
         paths = [
@@ -101,7 +106,8 @@ def _commit(run: Run, current: dict[str, Any], recovering: bool) -> dict[str, An
     return final
 
 
-def _draft_pr(run: Run, final: dict[str, Any]) -> None:
+def _draft_pr(run: Run, final: dict[str, Any], *, presentation: dict[str, Any] | None = None) -> None:
+    custom_body = pr_description.body_file(run, presentation, final["head"]) if presentation is not None else None
     target = _remote_repo(run)
     if run["baseRef"] == "HEAD" or re.fullmatch(r"[a-f0-9]{40}", run["baseRef"]):
         raise FactoryError("Draft PR needs a named --base branch.", "delivery")
@@ -117,14 +123,21 @@ def _draft_pr(run: Run, final: dict[str, Any]) -> None:
         raise FactoryError("Remote head does not match the verified commit.", "delivery")
     save(run, "push-observed")
     pr = _find_pr(run, target)
+    created = False
     if pr is None:
         body = Path(run["dir"]) / "pr-body.md"
-        criteria = "\n".join(f"- {criterion['text']}" for criterion in run["criteria"])
-        checks = "\n".join(f"- {check['name']}: passed" for check in run["verification"]["results"])
-        body.write_text(
-            f"## Task\n\n{run['task']}\n\n## Acceptance criteria\n\n{criteria}\n\n## Verification\n\n{checks}\n\nReviewed commit: {final['head']}\n",
-            encoding="utf-8",
-        )
+        if presentation is None:
+            criteria = "\n".join(f"- {criterion['text']}" for criterion in run["criteria"])
+            checks = "\n".join(f"- {check['name']}: passed" for check in run["verification"]["results"])
+            body.write_text(
+                f"## Task\n\n{run['task']}\n\n## Acceptance criteria\n\n{criteria}\n\n## Verification\n\n{checks}\n\nReviewed commit: {final['head']}\n",
+                encoding="utf-8",
+            )
+        else:
+            # Re-read selected artifact/body after network observations, before publication.
+            pr_description.selected(run)
+            body = pr_description.body_file(run, presentation, final["head"])
+            assert body == custom_body
         run["operation"] = {"kind": "pr-create", "commit": final["head"], "repository": target["nameWithOwner"]}
         save(run, "pr-intent")
         command(
@@ -140,12 +153,13 @@ def _draft_pr(run: Run, final: dict[str, Any]) -> None:
                 "--base",
                 base_branch,
                 "--title",
-                run["task"].splitlines()[0][:150],
+                presentation["title"] if presentation is not None else run["task"].splitlines()[0][:150],
                 "--body-file",
                 str(body),
             ],
             run["worktree"],
         )
+        created = True
         pr = _find_pr(run, target)
     if (
         not pr
@@ -160,6 +174,11 @@ def _draft_pr(run: Run, final: dict[str, Any]) -> None:
     ):
         raise FactoryError("PR is not an open draft for the verified head/base.", "delivery")
     run["delivery"].update(pr=pr["url"], number=pr["number"])
+    if presentation is not None:
+        run["delivery"]["presentation"] = {
+            "hash": run["prPresentation"]["hash"],
+            "outcome": "applied-by-create" if created else "reconciled-existing",
+        }
 
 
 def deliver(directory: str | Path) -> dict[str, Any]:
@@ -183,9 +202,16 @@ def deliver(directory: str | Path) -> dict[str, Any]:
             raise FactoryError("Delivery requires current verification and passing code review.", "gate")
         if not current["paths"]:
             raise FactoryError("Task has no changes against its base.")
-        final = _commit(run, current, recovering)
+        presentation = pr_description.selected(run)
+        if presentation is None:
+            final = _commit(run, current, recovering)
+        else:
+            final = _commit(run, current, recovering, presentation_hash=run["prPresentation"]["hash"])
         if run["endpoint"] == "draft-pr":
-            _draft_pr(run, final)
+            if presentation is None:
+                _draft_pr(run, final)
+            else:
+                _draft_pr(run, final, presentation=presentation)
         if (
             not same_evidence({**current, "head": final["head"]}, evidence(run))
             or git(run["worktree"], ["status", "--porcelain"]).strip()

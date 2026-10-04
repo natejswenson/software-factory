@@ -36,6 +36,9 @@ class FactoryCase(unittest.TestCase):
         git(repo, ["config", "user.name", "Factory Test"])
         git(repo, ["config", "user.email", "factory@example.invalid"])
         git(repo, ["config", "commit.gpgsign", "false"])
+        # Keep disposable-repository byte snapshots independent of background GC.
+        git(repo, ["config", "maintenance.auto", "false"])
+        git(repo, ["config", "gc.auto", "0"])
         atomic_json(
             repo / ".factory.json",
             {
@@ -150,6 +153,7 @@ elif args[1] == 'create':
     get = lambda key: args[args.index(key) + 1]
     file.write_text(json.dumps({'number': 1, 'url': 'https://github.com/example/demo/pull/1', 'isDraft': True, 'state': 'OPEN',
         'headRefName': get('--head'), 'baseRefName': get('--base'),
+        'title': get('--title'), 'body': Path(get('--body-file')).read_text(encoding='utf-8'),
         'headRefOid': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}))
     sys.exit(1 if os.environ.get('MOCK_FAIL') == '1' else 0)
 else:

@@ -72,7 +72,8 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
             except ProcessLookupError:
                 pass
             except OSError as error:
-                result["error"] = str(error)
+                result.setdefault("error", str(error))
+                result.setdefault("cleanupErrors", []).append(str(error))
 
     def interrupted(signum: int, frame: Any) -> None:
         result["error"] = "Verification interrupted"

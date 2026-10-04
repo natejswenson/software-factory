@@ -1,17 +1,65 @@
 """Real process groups: timeout, successful orphans, interrupts and bounded logs."""
 
 import json
+import os
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+from unittest.mock import patch
 
+from software_factory import checks
 from software_factory.checks import execute_check
 from tests.support import ROOT, FactoryCase
 
 
 class ProcessTests(FactoryCase):
+    def test_cleanup_permission_diagnostics_preserve_primary_interrupt(self):
+        f = self.fixture()
+        original_signal, original_kill = signal.signal, os.killpg
+        handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+        denied = False
+
+        def kill_once(pid, sig):
+            nonlocal denied
+            if not denied:
+                denied = True
+                raise PermissionError("synthetic cleanup denial")
+            return original_kill(pid, sig)
+
+        def install(sig, handler):
+            previous = original_signal(sig, handler)
+            if sig == signal.SIGTERM and getattr(handler, "__name__", "") == "interrupted":
+                handler(sig, None)
+            return previous
+
+        with (
+            patch.object(checks.os, "killpg", side_effect=kill_once),
+            patch.object(checks.signal, "signal", side_effect=install),
+        ):
+            result = execute_check(
+                {"name": "interrupt-denial", "argv": [sys.executable, "-c", "pass"], "timeoutMs": 2000},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["error"], "Verification interrupted")
+        self.assertEqual(result["cleanupErrors"], ["synthetic cleanup denial"])
+        self.assertEqual({sig: signal.getsignal(sig) for sig in handlers}, handlers)
+
+    def test_cleanup_only_permission_failure_still_fails_check(self):
+        f = self.fixture()
+        with patch.object(checks.os, "killpg", side_effect=PermissionError("synthetic cleanup denial")):
+            result = execute_check(
+                {"name": "cleanup-denial", "argv": [sys.executable, "-c", "pass"], "timeoutMs": 2000}, f.root, f.root, 1
+            )
+        self.assertEqual(result["exitCode"], 0)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["error"], "synthetic cleanup denial")
+        self.assertTrue(result["cleanupErrors"])
+
     def parent(self, root, *, exit_early=False, inherited_pipes=False):
         target = root / "orphan.txt"
         script = root / "parent.py"

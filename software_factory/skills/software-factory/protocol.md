@@ -74,3 +74,20 @@ never silently drop them. Bundles stay private and no model/network call occurs.
 A native reviewer still writes its genuine artifact using the unchanged schemas
 above, copying exact context/evidence. Capture reserves nothing; submission rechecks
 freshness. A bundle cannot establish reviewer independence or prose truth.
+
+## Optional PR description
+
+Private JSON input permits version (1), evidence (complete current verified object),
+title (trimmed single line, 1–150 characters, no controls), summary (1–5 nonempty
+paragraph strings), and optional compatibility/risks strings. Unknown/duplicate keys,
+unsafe files, malformed UTF-8/JSON and inputs beyond 16 KiB are rejected. Literal text
+is preserved. `pr-description --run ... --file ...` returns a full preview with private
+paths/hash; review its prose and generated all-criteria/check sections explicitly.
+Custom UTF-8 rendering is capped at 48 KiB before writes or publication, without truncation.
+
+Submission does not change these review schemas, evidence keys, verification or budget.
+Code review may precede or follow submission, but must still pass for delivery. Provide
+the preview as an attributed native-review supplement; freshness cannot certify prose.
+Presentation and final body hashes are immutable after delivery selection; missing or
+changed artifacts must not fall back. Existing matching drafts preserve their metadata,
+with reconciliation distinguished from a successful create that applied this input.
