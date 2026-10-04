@@ -28,7 +28,7 @@ include = ["software_factory*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-software_factory = ["skills/software-factory/*.md"]
+software_factory = ["skills/software-factory/*.md", "templates/prd/*.md"]
 
 [tool.setuptools_scm]
 version_file = "software_factory/_version.py"

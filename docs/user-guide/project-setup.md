@@ -5,7 +5,8 @@ Select checks that actually establish the project's behavior:
 factory init --repo /path/to/app --check '["python3","-m","unittest","discover","-s","tests"]'
 ```
 
-`init` creates `.rules/factory.md`. Review and commit it on your selected base.
+`init` creates `.rules/factory.md` plus `prd/README.md` and `prd/_template.md`.
+Review and commit the intended settings/scaffold on your selected base.
 Settings and repository instructions live together in Markdown. For example,
 create `.rules/factory.md` with:
 
@@ -68,3 +69,21 @@ subsequent tasks use the new configuration. Changes to legacy
 `.factory.json` retain the existing frozen-check behavior and appear in the
 reviewed diff. Runs created before rules support retain their original evidence
 protocol; rules apply automatically to new runs without rewriting old receipts.
+
+## PRD setup for existing projects
+
+```sh
+factory prd-init --repo /path/to/app --json
+```
+
+This independent command requires Git, resolves its root even from a subdirectory
+or linked worktree, and changes only missing scaffold files. It creates no settings,
+run, branch, commit or PR. Existing regular files are preserved byte-for-byte;
+there is no force or upgrade option. Symlinks and wrong types are rejected before
+writes. A write failure can leave partial files; errors report potentially incomplete
+created paths without rollback. Inspect/repair content manually; rerun fills only
+missing files. `init` still refuses existing settings: use `prd-init` to retrofit.
+
+JSON returns repo/prd paths, sorted disjoint created/skipped relative paths and next.
+`init --json` retains config/next and adds a nested prd result with the same shape.
+The scaffold is bundled in wheel/source packages, independent of working directory.

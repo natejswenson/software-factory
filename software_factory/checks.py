@@ -64,15 +64,33 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
     }
     child: subprocess.Popen[bytes] | None = None
     handlers = {}
+    group_killed = False
+    signalling = False
+    kill_requested = False
 
     def kill_group(sig: int) -> None:
-        if child is not None:
-            try:
-                os.killpg(child.pid, sig)
-            except ProcessLookupError:
-                pass
-            except OSError as error:
-                result["error"] = str(error)
+        nonlocal group_killed, signalling, kill_requested
+        if signalling:
+            if sig == signal.SIGKILL:
+                kill_requested = True
+            return
+        signalling = True
+        try:
+            if child is not None and not group_killed:
+                try:
+                    os.killpg(child.pid, sig)
+                    if sig == signal.SIGKILL:
+                        group_killed = True
+                except ProcessLookupError:
+                    group_killed = True
+                except OSError as error:
+                    result.setdefault("error", str(error))
+                    result.setdefault("cleanupErrors", []).append(str(error))
+        finally:
+            signalling = False
+            if kill_requested:
+                kill_requested = False
+                kill_group(signal.SIGKILL)
 
     def interrupted(signum: int, frame: Any) -> None:
         result["error"] = "Verification interrupted"
