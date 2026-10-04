@@ -113,6 +113,25 @@ def tag_commit(repo: str, tag: str) -> str | None:
     raise ValueError("Release tag does not resolve to a commit.")
 
 
+def find_release(repo: str, tag: str) -> dict | None:
+    """Find drafts as well as published releases with authenticated push access."""
+    for page in range(1, 101):
+        records = api(f"repos/{repo}/releases?per_page=100&page={page}")
+        for record in records:
+            if record["tag_name"] == tag:
+                return record
+        if len(records) < 100:
+            return None
+    raise ValueError("Release lookup exceeded its pagination bound; inspect before retrying.")
+
+
+def require_release(repo: str, tag: str) -> dict:
+    record = find_release(repo, tag)
+    if record is None:
+        raise ValueError("Expected release was not observed after mutation.")
+    return record
+
+
 def verify_published(repo: str, tag: str, version: str, release: dict) -> None:
     expected = {f"software_factory-{version}-py3-none-any.whl", f"software_factory-{version}.tar.gz", "SHA256SUMS"}
     if {asset["name"] for asset in release["assets"]} != expected:
@@ -137,7 +156,7 @@ def publish(repo: str, commit: str, version: str, directory: Path) -> dict[str, 
         api(f"repos/{repo}/git/refs", method="POST", data={"ref": f"refs/tags/{tag}", "sha": commit})
     if tag_commit(repo, tag) != commit:
         raise ValueError("Remote release tag does not match the tested commit.")
-    release = api(f"repos/{repo}/releases/tags/{tag}", missing=True)
+    release = find_release(repo, tag)
     if release and release.get("prerelease"):
         raise ValueError("Existing release is a prerelease; inspect before retrying.")
     if release and not release["draft"]:
@@ -161,10 +180,10 @@ def publish(repo: str, commit: str, version: str, directory: Path) -> dict[str, 
     checksum = directory / "SHA256SUMS"
     checksum.write_text(checksums(assets))
     command("gh", "release", "upload", tag, "--repo", repo, "--clobber", *map(str, [*assets, checksum]))
-    release = api(f"repos/{repo}/releases/tags/{tag}")
+    release = require_release(repo, tag)
     verify_published(repo, tag, version, release)
     command("gh", "release", "edit", tag, "--repo", repo, "--draft=false")
-    release = api(f"repos/{repo}/releases/tags/{tag}")
+    release = require_release(repo, tag)
     if release["draft"] or tag_commit(repo, tag) != commit:
         raise ValueError("Published release was not observed at the tested commit.")
     return {"tag": tag, "commit": commit, "url": release["html_url"], "state": "published"}

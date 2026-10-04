@@ -264,13 +264,14 @@ class ReleaseTests(unittest.TestCase):
     def test_published_retry_is_read_only(self):
         self.assets()
         record = {
+            "tag_name": "v0.2.1",
             "draft": False,
             "prerelease": False,
             "html_url": "https://github.com/example/factory/releases/tag/v0.2.1",
         }
         with (
             patch.object(release, "tag_commit", return_value=HEAD),
-            patch.object(release, "api", return_value=record),
+            patch.object(release, "api", return_value=[record]),
             patch.object(release, "verify_published") as verify_published,
             patch.object(release, "command") as command,
         ):
@@ -280,20 +281,86 @@ class ReleaseTests(unittest.TestCase):
         command.assert_not_called()
 
     def test_draft_retry_verifies_upload_before_publication(self):
-        self.assets()
-        draft = {"draft": True, "prerelease": False}
-        published = {"draft": False, "html_url": "https://github.com/example/factory/releases/tag/v0.2.1"}
+        paths = self.assets()
+        draft = {
+            "tag_name": "v0.2.1",
+            "draft": True,
+            "prerelease": False,
+            "assets": [{"name": path.name} for path in paths] + [{"name": "SHA256SUMS"}],
+        }
+        published = {**draft, "draft": False, "html_url": "https://github.com/example/factory/releases/tag/v0.2.1"}
+        records = iter([draft, draft, published])
+        operations = []
+
+        def lookup(path, **kwargs):
+            if path == f"repos/{REPO}/releases?per_page=100&page=1":
+                return [next(records)]
+            raise RuntimeError("Tag endpoint cannot discover the draft (HTTP 404)")
+
+        def command(*argv):
+            operation = argv[2]
+            operations.append(operation)
+            if operation == "download":
+                destination = Path(argv[-1])
+                for source in [*paths, self.folder / "SHA256SUMS"]:
+                    (destination / source.name).write_bytes(source.read_bytes())
+            elif operation not in ("upload", "edit"):
+                self.fail(f"Existing draft must not be recreated: {argv}")
+
         with (
             patch.object(release, "tag_commit", return_value=HEAD),
-            patch.object(release, "api", side_effect=[draft, draft, published]),
-            patch.object(release, "verify_published") as verify_published,
-            patch.object(release, "command") as command,
+            patch.object(release, "api", side_effect=lookup),
+            patch.object(release, "command", side_effect=command),
         ):
             result = release.publish(REPO, HEAD, "0.2.1", self.folder)
         self.assertEqual(result["state"], "published")
-        self.assertEqual(command.call_args_list[0].args[2], "upload")
-        self.assertEqual(command.call_args_list[1].args[2], "edit")
-        verify_published.assert_called_once()
+        self.assertEqual(operations, ["upload", "download", "edit"])
+        self.assertEqual((self.folder / "SHA256SUMS").read_text(), release.checksums(paths))
+
+    def test_release_lookup_finds_draft_on_later_page(self):
+        draft = {"tag_name": "v0.2.1", "draft": True}
+        with patch.object(release, "api", side_effect=[[{"tag_name": "v9.0.0"}] * 100, [draft]]) as api:
+            self.assertEqual(release.find_release(REPO, "v0.2.1"), draft)
+        self.assertEqual(
+            [call.args[0] for call in api.call_args_list],
+            [f"repos/{REPO}/releases?per_page=100&page={page}" for page in (1, 2)],
+        )
+
+    def test_release_lookup_short_page_means_absent(self):
+        with patch.object(release, "api", return_value=[{"tag_name": "v0.2.2"}]) as api:
+            self.assertIsNone(release.find_release(REPO, "v0.2.1"))
+        api.assert_called_once_with(f"repos/{REPO}/releases?per_page=100&page=1")
+
+    def test_release_lookup_bound_fails_closed(self):
+        with patch.object(release, "api", return_value=[{"tag_name": "v9.0.0"}] * 100) as api:
+            with self.assertRaisesRegex(ValueError, "pagination bound"):
+                release.find_release(REPO, "v0.2.1")
+        self.assertEqual(api.call_count, 100)
+
+    def test_release_lookup_propagates_repository_and_authentication_errors(self):
+        for status in (403, 404):
+            with self.subTest(status=status), patch.object(release, "api", side_effect=RuntimeError(f"HTTP {status}")):
+                with self.assertRaisesRegex(RuntimeError, str(status)):
+                    release.find_release(REPO, "v0.2.1")
+
+    def test_mutation_requires_observed_release(self):
+        with patch.object(release, "api", return_value=[]):
+            with self.assertRaisesRegex(ValueError, "not observed"):
+                release.require_release(REPO, "v0.2.1")
+
+    def test_checksum_readback_accepts_real_archive_metadata_and_checksums(self):
+        paths = self.assets()
+        record = {"assets": [{"name": path.name} for path in paths] + [{"name": "SHA256SUMS"}]}
+
+        def download(*argv):
+            destination = Path(argv[-1])
+            for source in paths:
+                (destination / source.name).write_bytes(source.read_bytes())
+            (destination / "SHA256SUMS").write_text(release.checksums(paths))
+
+        with patch.object(release, "command", side_effect=download) as command:
+            release.verify_published(REPO, "v0.2.1", "0.2.1", record)
+        self.assertEqual(command.call_args.args[:7], ("gh", "release", "download", "v0.2.1", "--repo", REPO, "--dir"))
 
     def test_checksum_readback_rejects_corruption(self):
         self.assets()
