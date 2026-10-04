@@ -295,6 +295,8 @@ class ReleaseTests(unittest.TestCase):
         def lookup(path, **kwargs):
             if path == f"repos/{REPO}/releases?per_page=100&page=1":
                 return [next(records)]
+            if path == f"repos/{REPO}/releases/latest":
+                return {"tag_name": "v0.2.2", "draft": False}
             raise RuntimeError("Tag endpoint cannot discover the draft (HTTP 404)")
 
         def command(*argv):
@@ -304,7 +306,9 @@ class ReleaseTests(unittest.TestCase):
                 destination = Path(argv[-1])
                 for source in [*paths, self.folder / "SHA256SUMS"]:
                     (destination / source.name).write_bytes(source.read_bytes())
-            elif operation not in ("upload", "edit"):
+            elif operation == "edit":
+                self.assertIn("--latest=false", argv)
+            elif operation != "upload":
                 self.fail(f"Existing draft must not be recreated: {argv}")
 
         with (
@@ -316,6 +320,32 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(result["state"], "published")
         self.assertEqual(operations, ["upload", "download", "edit"])
         self.assertEqual((self.folder / "SHA256SUMS").read_text(), release.checksums(paths))
+
+    def test_latest_selection_uses_numeric_versions_and_handles_first_release(self):
+        for observed, candidate, expected in (
+            (None, "0.2.1", True),
+            ("v0.2.9", "0.2.10", True),
+            ("v0.2.10", "0.2.9", False),
+            ("v0.3.0", "0.2.99", False),
+            ("v0.2.1", "0.2.1", True),
+        ):
+            with self.subTest(observed=observed, candidate=candidate):
+                record = {"tag_name": observed} if observed else None
+                with patch.object(release, "api", return_value=record) as api:
+                    self.assertEqual(release.should_mark_latest(REPO, candidate), expected)
+                api.assert_called_once_with(f"repos/{REPO}/releases/latest", missing=True)
+
+    def test_latest_selection_fails_closed_on_unexpected_versions_or_api_errors(self):
+        with patch.object(release, "api", return_value={"tag_name": "preview"}):
+            with self.assertRaisesRegex(ValueError, "unexpected version"):
+                release.should_mark_latest(REPO, "0.2.1")
+        with patch.object(release, "api", side_effect=RuntimeError("HTTP 403")):
+            with self.assertRaisesRegex(RuntimeError, "403"):
+                release.should_mark_latest(REPO, "0.2.1")
+        with patch.object(release, "api") as api:
+            with self.assertRaisesRegex(ValueError, "stable release"):
+                release.should_mark_latest(REPO, "0.2.1rc1")
+        api.assert_not_called()
 
     def test_release_lookup_finds_draft_on_later_page(self):
         draft = {"tag_name": "v0.2.1", "draft": True}
