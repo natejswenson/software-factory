@@ -6,3 +6,4 @@ build/
 dist/
 .factory-worktrees/
 .firecrawl/
+software_factory/_version.py

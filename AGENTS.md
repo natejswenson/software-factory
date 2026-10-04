@@ -10,3 +10,13 @@ Keep runtime data and personal paths outside source. Never launch paid model API
 Start work branches from main and name them feature/<name>, bug/<name>, or
 issue/<name>. Draft PRs target main or an explicitly selected
 lower stack layer. No implicit merges, releases or deletion of task worktrees.
+
+Every nonempty commit, including documentation/configuration changes, must add or
+semantically update an executable Python unittest test containing assertions.
+The associated test must pass in the final PR suite; comments, deletions, skipped
+tests and undiscovered helpers do not satisfy the gate. Inspect each commit's
+test relevance in review. GitHub CI's stable `test` check is required on main.
+Ready same-repository PRs from writers automatically squash-merge to main after
+passing protection; drafts remain drafts. Successful main merges create GitHub
+patch releases with tested wheel/source archives. Repository automation handles
+these authorized actions; the factory's task endpoint remains a reviewed draft PR.
