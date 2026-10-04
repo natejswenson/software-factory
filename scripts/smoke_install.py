@@ -133,6 +133,11 @@ def main() -> int:
         assert done["phase"] == "done"
         assert cli("explain", "--run", directory)["delivery"] == done["delivery"]
         assert cli("summary", "--run", directory)["delivery"] == done["delivery"]
+        inventory = cli("runs", "--repo", repo)
+        assert inventory["total"] == 1 and inventory["runs"][0]["delivery"] == done["delivery"]
+        recorded = cli("history", "--run", directory)
+        assert recorded["attempts"][0]["checks"][0]["status"] == "passed"
+        assert recorded["totals"]["knownAttempts"] == 1 and recorded["delivery"] == done["delivery"]
         skill = Path(cli("skill-path"))
         assert skill.is_relative_to(Path(sys.prefix))
         assert (skill / "SKILL.md").is_file() and (skill / "protocol.md").is_file()

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import diagnostics, engine, preflight, progress, review_context
+from . import diagnostics, engine, history, preflight, progress, review_context
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
@@ -28,7 +28,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, preflight, start, list, status, next, summary, explain, review-context, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, start, list, runs, history, status, next, summary, explain, review-context, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -44,9 +44,12 @@ def parser() -> Parser:
         "reason",
         "stage",
         "check-name",
+        "phase",
     ):
         result.add_argument(f"--{option}")
     result.add_argument("--attempts", type=int)
+    result.add_argument("--limit", type=int)
+    result.add_argument("--offset", type=int, default=0)
     result.add_argument("--attempt", type=int)
     result.add_argument("--tail-bytes", type=int, default=8192)
     for option in ("criterion", "check", "instructions-file", "supplement"):
@@ -94,6 +97,12 @@ def dispatch(args: argparse.Namespace) -> Any:
                 worktree_root=required("worktree-root"),
                 branch=args.branch,
             )
+        )
+    if action == "runs":
+        return history.discover(required("repo"), phase=args.phase, limit=20 if args.limit is None else args.limit)
+    if action == "history":
+        return history.inspect(
+            str(Path(required("run")).absolute()), offset=args.offset, limit=100 if args.limit is None else args.limit
         )
     if action == "list":
         return [
@@ -166,6 +175,10 @@ def format_output(action: str, result: Any) -> str:
         return progress.format_logs(result)
     if action == "explain":
         return diagnostics.format_report(result)
+    if action == "runs":
+        return history.format_runs(result)
+    if action == "history":
+        return history.format_history(result)
     if action == "summary":
         return format_summary(result)
     if action == "rules":
@@ -220,6 +233,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.json
             else format_output(args.command, result)
         )
+        if args.command in ("runs", "history"):
+            return 2 if result["errors"] else 0
         if args.command == "progress":
             return 2 if args.observation_blocked else 0
         if args.command == "explain":

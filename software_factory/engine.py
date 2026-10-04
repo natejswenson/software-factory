@@ -30,6 +30,8 @@ from .store import (
 )
 from .validation import json_integer
 
+_LIVE_PLAN = object()
+
 EVIDENCE_KEYS = ("base", "criteria", "config", "plan", "rules", "head", "tree")
 
 
@@ -236,22 +238,25 @@ def task_rules(run: Run) -> dict[str, Any]:
     return {"enabled": True, **rules, "snapshot": str(Path(run["dir"]) / "rules-initial.json")}
 
 
-def context(run: Run) -> dict[str, Any]:
+def context(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) -> dict[str, Any]:
     assert_worktree(run)
     plan = Path(run["dir"]) / "plan.md"
+    # Only read-only observers supply pinned bytes; mutation gates use live defaults.
+    content = (plan.read_bytes() if plan.exists() else None) if captured_plan is _LIVE_PLAN else captured_plan
     result = {
         "base": run["base"],
         "criteria": fingerprint(run["criteria"]),
         "config": run["configHash"],
-        "plan": fingerprint(plan.read_bytes()) if plan.exists() else None,
+        "plan": fingerprint(content) if content is not None else None,
     }
     if run.get("rules"):
         result["rules"] = task_rules(run)["hash"]
     return result
 
 
-def evidence(run: Run) -> dict[str, Any]:
-    return {**context(run), **snapshot(run["worktree"], run["base"])}
+def evidence(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) -> dict[str, Any]:
+    ctx = context(run) if captured_plan is _LIVE_PLAN else context(run, captured_plan=captured_plan)
+    return {**ctx, **snapshot(run["worktree"], run["base"])}
 
 
 def same_evidence(left: Any, right: Any) -> bool:
@@ -309,7 +314,7 @@ def check_verified(run: Run) -> dict[str, Any]:
     return current
 
 
-def next_action(run: Run) -> dict[str, Any]:
+def next_action(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) -> dict[str, Any]:
     if run.get("renameIntent"):
         return {"action": "resume", "reason": "Reconcile interrupted branch rename."}
     if run["phase"] == "preparing":
@@ -323,7 +328,7 @@ def next_action(run: Run) -> dict[str, Any]:
             "failures": run["failures"],
             "limit": run["failureLimit"],
         }
-    ctx = context(run)
+    ctx = context(run) if captured_plan is _LIVE_PLAN else context(run, captured_plan=captured_plan)
     if not ctx["plan"]:
         return {"action": "plan", "output": str(Path(run["dir"]) / "plan.md")}
     review = run.get("planReview")
@@ -337,7 +342,7 @@ def next_action(run: Run) -> dict[str, Any]:
             "action": "implement",
             "reason": "Fix failed checks, then verify." if failed else "Implement the reviewed plan, then verify.",
         }
-    current = evidence(run)
+    current = evidence(run) if captured_plan is _LIVE_PLAN else evidence(run, captured_plan=captured_plan)
     verification, code_review = run.get("verification"), run.get("codeReview")
     if (
         code_review

@@ -80,6 +80,13 @@ ownership. Before delivery, `rename --run <run> --branch feature/<name>` records
 and reconciles a branch rename and invalidates verification/code review; obtain
 fresh evidence afterward. Never manually edit saved branch ownership.
 
+For discovery, `runs --repo <repo> --phase <phase> --limit 20 --json` isolates
+unreadable neighbors and shows saved outcomes plus current-next availability.
+Use `history --run <run> --offset 0 --limit 100 --json` for append-order event pages
+and distinct recorded check attempts/timings; these are local records, not refreshed
+remote state or task wall time. Partial errors need inspection, never automatic
+ledger repair. Original list/allocation behavior stays strict.
+
 For saved work, use `list --repo <repo> --json`, select the matching run, and
 `resume --run <run> --json`. Never start over merely because context compacted.
 Work in the returned worktree, preserving the original checkout. Read the

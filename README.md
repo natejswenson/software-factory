@@ -67,6 +67,8 @@ inputs for your native reviewer after verification; the reviewer supplies judgme
 Use `factory progress --run /path/to/run` during verification and
 `factory logs --run /path/to/run --check-name tests --tail-bytes 8192` for a
 bounded log tail. These observations do not replace verification or review.
+Use `factory runs --repo /path/to/app` to find a saved task and
+`factory history --run /path/to/run` to inspect its recorded events and check attempts.
 
 ## Read more
 

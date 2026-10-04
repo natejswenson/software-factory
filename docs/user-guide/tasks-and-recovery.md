@@ -205,3 +205,44 @@ Readable failed/interrupted observations return 0. Invalid arguments or missing
 selected logs return 2; infrastructure errors 3. Blocked progress returns 2 with a
 valid report. Readers execute no checks, make no network/model calls and change no
 state, receipts, source or index. Summary and original gate decisions stay unchanged.
+
+## Find runs and read recorded history
+
+```sh
+factory runs --repo /path/to/app --phase implement --limit 20 --json
+factory history --run /path/to/run --offset 0 --limit 100 --json
+```
+
+Runs sorts valid UTC updated times newest first, falling back to created times;
+IDs break ties and invalid/missing times sort last with labeled errors. Phase
+filtering happens before the limit (1–1000). `total` counts readable projected
+rows, `matched` counts filtered rows before limiting. Invalid neighbors are listed
+in errors. Stored task title, phase, branch/base, endpoint, attempts, failures and
+delivery remain visible when current-next inspection fails. `nextAvailable` and
+`nextAction` describe that separate inspection; a live owner returns wait without
+inspecting source. Recorded delivery is local history, never refreshed remote state.
+
+History retains append order even if clocks move backward. Event pages have stable
+original indices, at/action and saved details; offset defaults 0 and limit 100. Pages
+cover events only: every bounded attempt summary remains available across pages.
+Frozen checks absent from a valid attempt are not-run, never reused prior passes.
+Missing/invalid receipts are explicit; missing durations are null. Totals include
+known attempts, saved failures, available check execution milliseconds, missing
+receipts and missing duration metrics. They do not measure total task wall time.
+
+Historical branches remain accepted. Candidate directories and receipt/state/owner/
+plan descendants use pinned no-follow descriptors; files allow 2 MiB (owners 128 KiB).
+Metadata nesting is limited to 64 levels; non-finite numbers are rejected.
+Durations must be integral milliseconds from 0 through 2^63-1. Unsupported
+metrics are unavailable with errors, and accepted durations sum as integers.
+Only numeric verification receipts up to the saved counter are read, never logs.
+History reads at most 1000 attempts and reports an error for a larger counter.
+Changed atomic snapshots retry once, then report unavailable inspection.
+Unavailable history snapshots expose no passing attempts or timing totals. These
+commands create/recover/delete nothing and make no network/model calls.
+
+Normal reports return 0 even with blocked rows. Invalid/unreadable records or
+required per-run inspection errors return 2 with a partial report; top-level
+infrastructure failure returns 3. The strict `list` and task-allocation readers
+retain their original behavior. Select a run explicitly and use normal resume/
+recovery rules; inventories cannot repair a ledger or certify current delivery.
