@@ -22,7 +22,7 @@ releasing are separate decisions.
 ## Get started
 
 Requires Python 3.11+, Git, macOS/Linux, and `gh` authenticated for GitHub delivery.
-Install from source with [uv](https://docs.astral.sh/uv/guides/tools/) (no PyPI release yet):
+Install from source with [uv](https://docs.astral.sh/uv/guides/tools/):
 
 ```sh
 git clone https://github.com/natejswenson/software-factory.git
@@ -31,253 +31,39 @@ uv tool install .
 factory --help
 ```
 
-Add the bundled skill to your agent. `factory skill-path` locates it in the
-installed Python package:
+Add the bundled skill to Codex:
 
 ```sh
-# Codex
 mkdir -p ~/.agents/skills
 ln -sfn "$(factory skill-path)" ~/.agents/skills/software-factory
-
-# Claude Code
-mkdir -p ~/.claude/skills
-ln -sfn "$(factory skill-path)" ~/.claude/skills/software-factory
 ```
 
-Then ask your agent: **“Use software-factory in this repo to fix [task]. Finish
-with verified changes and a draft PR.”** The skill drives the loop in your
-current session. The CLI prints the next action; it does not call a model itself.
+[Installation](docs/user-guide/installation.md) includes Claude Code, pip, source
+invocation and migration from the earlier npm package. The runtime has no
+third-party dependencies; packages are available through
+[GitHub releases](https://github.com/natejswenson/software-factory/releases), not PyPI.
 
-## Python installation and existing runs
+## Quickstart
 
-The runtime has no third-party dependencies. `uv tool install .` builds a standard
-wheel with setuptools in an isolated build environment. A pip alternative is:
-
-```sh
-python3 -m venv /path/to/factory-venv
-/path/to/factory-venv/bin/python -m pip install .
-/path/to/factory-venv/bin/factory --help
-```
-
-From a checkout, use `python3 -m software_factory` wherever examples say `factory`.
-No installation is needed for source development or the test suite.
-
-When replacing an earlier npm installation, uninstall that package explicitly
-(`npm uninstall --global @natejswenson/software-factory`), then install this Python
-version and reconnect the skill symlinks using `factory skill-path`. Keep the old
-runtime until active work has been reviewed if you prefer a gradual migration.
-Run directories, version-1 JSON receipts, context hashes and historical branch
-ownership are retained. No state migration or receipt editing is required.
-Existing tasks keep their original check argv: if a project's frozen checks use
-Node, that project still requires Node for those checks. The factory itself does
-not. `resume`, `summary` and delivery operate on the same saved run directory.
-
-## Enroll a project once
-
-Select checks that actually establish the project's behavior:
+Enroll your project with a meaningful check:
 
 ```sh
 factory init --repo /path/to/app --check '["python3","-m","unittest","discover","-s","tests"]'
 ```
 
-`init` creates `.rules/factory.md`. Review and commit it on your selected base.
-Settings and repository instructions live together in Markdown. For example,
-create `.rules/factory.md` with:
+Review and commit the generated `.rules/factory.md` on your selected base. Then
+ask your coding agent: **“Use software-factory in this repo to fix [task]. Finish
+with verified changes and a draft PR.”** The skill drives the loop in your
+current session; the CLI prints the next action and does not call a model itself.
 
-````markdown
-# Software Factory
+## Read more
 
-```factory-config
-{
-  "version": 1,
-  "endpoint": "draft-pr",
-  "checks": [
-    { "name": "tests", "argv": ["python3", "-m", "unittest", "discover", "-s", "tests"], "timeoutMs": 120000 }
-  ]
-}
-```
-
-## Repository instructions
-
-Use the existing module patterns. Add a regression test for each bug fix.
-Explain any change to public APIs in the README.
-````
-
-Add other instructions in files such as `.rules/testing.md` and
-`.rules/review.md`. Direct lowercase `*.md` files are read in lexical filename
-order; nested directories and other extensions are skipped. Missing `.rules`
-means no extra instructions. Files must be regular UTF-8 files, at most 128 KiB
-each, 128 files and 1 MiB total. Symlinks are rejected. Instructions are read by
-the agent and both reviewers; the CLI does not execute Markdown or interpret
-natural language as check commands. Explicit user and host/repository
-instructions take priority. Rules do not authorize merges or bypass review.
-
-A `factory-config` fence (backticks or tildes) contains a JSON object with only
-`version`, `endpoint` and `checks`. Settings can be split among files, but each
-key may appear only once across all config blocks. Duplicate JSON keys,
-unknown settings and malformed/unterminated config blocks are errors. Examples
-inside another code fence are not settings. Default version is 1 and endpoint
-is `draft-pr`; at least one meaningful check is required. Checks use literal
-argv arrays and `timeoutMs` (100–600000). No shell is added.
-
-Existing `.factory.json` projects remain supported. When both formats exist,
-the valid legacy file provides the baseline and Markdown settings explicitly
-override its keys. To migrate, move the JSON into a `factory-config` fence and
-remove `.factory.json`; commit both changes before starting the next task.
-`init` refuses existing settings rather than overwriting them.
-
-Configuration and selected rules must match the committed selected base at
-start. The task then reads rules from its own worktree; edits in the original
-checkout cannot replace those instructions. `factory rules --run <run>` prints
-current rules; `--json` returns exact file paths, content, hashes and the initial
-snapshot path. Initial content is preserved privately as `rules-initial.json`
-and in saved state; `status` labels its initial hash and paths. Resume retains
-that snapshot and checks current worktree instructions.
-
-Adding, editing or removing a rule requires fresh plan review, checks and code
-review before delivery, even if the rule file is ignored by Git. Settings are
-frozen at task start: editing Markdown settings requires fresh plan review,
-verification with the original checks and code review. The active task keeps its
-original endpoint as well. Reviewed settings changes can be delivered normally;
-subsequent tasks use the new configuration. Changes to legacy
-`.factory.json` retain the existing frozen-check behavior and appear in the
-reviewed diff. Runs created before rules support retain their original evidence
-protocol; rules apply automatically to new runs without rewriting old receipts.
-
-## Tasks and recovery
-
-Your agent normally handles these commands:
-
-```sh
-factory start --repo /path/to/app --task "Fix empty search results" \
-  --criterion "Empty search shows a clear message" --base main \
-  --worktree-root /path/to/approved/worktrees
-factory list --repo /path/to/app
-factory summary --run /path/returned/by/start
-factory rules --run /path/returned/by/start
-factory next --run /path/returned/by/start --json
-factory resume --run /path/returned/by/start --json
-```
-
-Use `--task-file` for longer requests, `--issue 42` for frozen GitHub issue intake,
-and repeat `--criterion` for multiple outcomes. `--endpoint local` explicitly
-selects a clean verified commit. A named `--base feature/lower-layer` supports
-one dependent stack layer; automatic stack management is not included.
-
-New runs use `feature/<task-slug>-<id>`. Select a branch with
-`--branch feature/<name>`, `bug/<name>` or `issue/<name>` using lowercase words
-separated by hyphens. `factory rename --run <run> --branch feature/<name>`
-renames an owned task before delivery, records the intent and observed ownership,
-and clears verification/code review. Resume reconciles interrupted renames;
-collisions and changed ownership/HEAD are rejected.
-
-Runs and logs live under the repository's Git common-dir (`factory/runs`), not
-in source. Original dirty files are preserved. No branch/worktree is removed
-automatically. `recover --run <run>` clears dead operation and start-allocation
-locks; `recover --repo <repo>` recovers a start that never returned a run path.
-Recovery refuses a live process lock. A `SIGKILL` can leave a
-check process alive: inspect and stop that task's orphan before recovery.
-`extend --attempts 1 --reason "User authorized another attempt"` extends a
-blocked run only under explicit user direction.
-
-Read the [skill](skills/software-factory/SKILL.md) and
-[artifact protocol](skills/software-factory/protocol.md) for plan/review commands.
-Use `--json` for every command when integrating another agent or UI.
-
-`summary` is a read-only overview: task, criteria, last check results, findings
-from the latest plan and code reviews, next action and delivery. Checks not
-executed in the last attempt say `not run`, including checks skipped after a
-failure. Findings stay visible until a newer review or verification supersedes
-them. Last results may be stale after edits; the next action reflects the current
-files. A committed change with PR delivery still pending is shown as pending.
-
-`summary --json` emits one compact line with `id`, `task`, `phase`, `endpoint`,
-`criteria`, `checks`, `verification`, `findings`, `next` and `delivery`.
-Each configured check contains its exact `result`, or `null` when unrun.
-`verification` retains `passed`, `unchanged` and `at`; `findings` has `plan` and
-`code` arrays. `next` retains action, reason and applicable recovery details,
-without review context or Git evidence. `delivery` is the exact current receipt
-or `null`. Strings and result values are preserved; full evidence is available
-through `status --json`. Like status, a blocked run returns exit code 2.
-
-## What the evidence establishes
-
-The snapshot includes tracked files even under ignore rules, nonignored new
-files, deletions, executable modes and symlink targets. Check commands must all
-pass without changing that snapshot. Review binds the plan, criteria, checks,
-repository rules, base, HEAD and Git tree. Delivery observes the exact committed tree and, for
-GitHub, an open draft PR with the same branch/head/base.
-
-The engine validates evidence structure and freshness. It cannot prove that a
-reviewer reasoned correctly, that tests cover every bug, or that two reviewers
-are independent. Ignored dependencies, external services and environment state
-are outside the Git fingerprint. Submodules and conflicted indexes are rejected.
-Local processes and state files are trusted; hashes are not a security sandbox.
-
-Checks execute repository code with your host's permissions. No shell is added
-by the engine; an explicitly configured shell command still runs that shell.
-Check output is capped at 1 MiB per log, with truncation recorded. Timeout and
-interrupt handling terminate POSIX process groups. No paid model API, telemetry,
-account database, memory service or Kubernetes platform is required. The skill
-uses existing authorized memory/preview integrations when present.
-
-## Development
-
-### Automatic main merges and releases
-
-Every ready same-repository PR targeting `main` automatically squash-merges when
-the required GitHub Actions `test` check passes. Drafts stay drafts; marking one
-ready reruns CI. Fork PRs and authors without repository write permission need a
-maintainer's merge. Native branch protection also prevents direct main pushes,
-force pushes and deletion, including by administrators.
-
-Each nonempty commit must add or semantically update a Python unittest test with
-assertions under `tests/test*.py`, including documentation/configuration commits.
-The associated test must actually pass in the final suite. A test in the final
-commit cannot cover earlier untested commits. Comment/docstring-only edits,
-test deletion, skipped tests and undiscovered helper classes do not count.
-CI runs the complete suite, source checks, wheel/source build and isolated
-installation smoke on Linux with Python 3.11/3.14 and macOS with Python 3.14.
-The `test` aggregate never passes if any matrix leg fails or is canceled.
-These gates prove structural association and execution, not that a test is
-relevant or exhaustive; factory review must still inspect behavior coverage.
-
-After each successful main merge, Release verifies the exact immutable main
-commit, builds from its version tag and publishes a GitHub patch release with
-wheel, source archive and `SHA256SUMS`. Versions start at `v0.2.1` and increase
-above the highest stable tag. Build-time setuptools-scm supplies matching
-package/runtime versions; it is not a runtime dependency. No PyPI upload or
-standing release secret is needed. Download packages from
-[GitHub releases](https://github.com/natejswenson/software-factory/releases).
-
-The trusted automatic merge job dispatches the exact observed merge commit
-because ordinary push workflows do not run for merges made with `GITHUB_TOKEN`.
-It never checks out PR code or consumes PR artifacts. Failed dispatch can be
-retried by rerunning Auto merge: an already-merged matching-head PR redispatches
-the same commit. Release verifies existing tags/releases/assets on retry and
-refuses collisions; it uploads to a draft before publishing.
-
-Allocation, build and publication share one noncanceling release queue. GitHub
-allows 100 pending runs; overflow is canceled and needs an explicit retry.
-Inspect canceled/failed Release runs and dispatch the missing exact main commit:
-
-```sh
-gh workflow run release.yml --ref main -f commit=<full-main-commit-sha>
-```
-
-Retries of an already published commit verify its existing assets rather than
-creating another version. Cancellation/outages are visible in Actions; no
-unbounded queue or guaranteed event delivery is claimed.
-
-```sh
-python3 scripts/verify.py tests
-python3 scripts/verify.py source
-uv build
-```
-
-Integration tests use real Git repositories, worktrees and check processes;
-GitHub failure/retry behavior is tested with a local adapter. Live delivery and
-native-agent task evidence are recorded in `docs/plans/` when observed.
+- [Project setup](docs/user-guide/project-setup.md): settings, repository rules and compatibility.
+- [Tasks and recovery](docs/user-guide/tasks-and-recovery.md): intake, stacks, summaries and interrupted work.
+- [Evidence](docs/reference/evidence.md): what verification and review establish.
+- [Documentation](docs/README.md) and [contributing](CONTRIBUTING.md).
+- [Execution designs](design/README.md) and [product requirements](prd/README.md).
+- [Bundled skill](software_factory/skills/software-factory/SKILL.md) and [artifact protocol](software_factory/skills/software-factory/protocol.md).
 
 The project aims for a small, dependable task loop that fits existing agents.
 Universal “best factory” claims require comparative benchmarks and are not

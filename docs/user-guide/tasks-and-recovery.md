@@ -1,0 +1,55 @@
+# Tasks and recovery
+
+Your agent normally handles these commands:
+
+```sh
+factory start --repo /path/to/app --task "Fix empty search results" \
+  --criterion "Empty search shows a clear message" --base main \
+  --worktree-root /path/to/approved/worktrees
+factory list --repo /path/to/app
+factory summary --run /path/returned/by/start
+factory rules --run /path/returned/by/start
+factory next --run /path/returned/by/start --json
+factory resume --run /path/returned/by/start --json
+```
+
+Use `--task-file` for longer requests, `--issue 42` for frozen GitHub issue intake,
+and repeat `--criterion` for multiple outcomes. `--endpoint local` explicitly
+selects a clean verified commit. A named `--base feature/lower-layer` supports
+one dependent stack layer; automatic stack management is not included.
+
+New runs use `feature/<task-slug>-<id>`. Select a branch with
+`--branch feature/<name>`, `bug/<name>` or `issue/<name>` using lowercase words
+separated by hyphens. `factory rename --run <run> --branch feature/<name>`
+renames an owned task before delivery, records the intent and observed ownership,
+and clears verification/code review. Resume reconciles interrupted renames;
+collisions and changed ownership/HEAD are rejected.
+
+Runs and logs live under the repository's Git common-dir (`factory/runs`), not
+in source. Original dirty files are preserved. No branch/worktree is removed
+automatically. `recover --run <run>` clears dead operation and start-allocation
+locks; `recover --repo <repo>` recovers a start that never returned a run path.
+Recovery refuses a live process lock. A `SIGKILL` can leave a
+check process alive: inspect and stop that task's orphan before recovery.
+`extend --attempts 1 --reason "User authorized another attempt"` extends a
+blocked run only under explicit user direction.
+
+Read the [skill](../../software_factory/skills/software-factory/SKILL.md) and
+[artifact protocol](../../software_factory/skills/software-factory/protocol.md) for plan/review commands.
+Use `--json` for every command when integrating another agent or UI.
+
+`summary` is a read-only overview: task, criteria, last check results, findings
+from the latest plan and code reviews, next action and delivery. Checks not
+executed in the last attempt say `not run`, including checks skipped after a
+failure. Findings stay visible until a newer review or verification supersedes
+them. Last results may be stale after edits; the next action reflects the current
+files. A committed change with PR delivery still pending is shown as pending.
+
+`summary --json` emits one compact line with `id`, `task`, `phase`, `endpoint`,
+`criteria`, `checks`, `verification`, `findings`, `next` and `delivery`.
+Each configured check contains its exact `result`, or `null` when unrun.
+`verification` retains `passed`, `unchanged` and `at`; `findings` has `plan` and
+`code` arrays. `next` retains action, reason and applicable recovery details,
+without review context or Git evidence. `delivery` is the exact current receipt
+or `null`. Strings and result values are preserved; full evidence is available
+through `status --json`. Like status, a blocked run returns exit code 2.
