@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import diagnostics, engine, preflight, review_context
+from . import diagnostics, engine, preflight, progress, review_context
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
@@ -28,7 +28,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, preflight, start, list, status, next, summary, explain, review-context, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, start, list, status, next, summary, explain, review-context, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -43,9 +43,12 @@ def parser() -> Parser:
         "file",
         "reason",
         "stage",
+        "check-name",
     ):
         result.add_argument(f"--{option}")
     result.add_argument("--attempts", type=int)
+    result.add_argument("--attempt", type=int)
+    result.add_argument("--tail-bytes", type=int, default=8192)
     for option in ("criterion", "check", "instructions-file", "supplement"):
         result.add_argument(f"--{option}", action="append", default=[])
     result.add_argument("--json", action="store_true")
@@ -112,6 +115,14 @@ def dispatch(args: argparse.Namespace) -> Any:
             instructions_files=args.instructions_file,
             supplements=args.supplement,
         )
+    if action == "progress":
+        run = read_run(run_path())
+        args.observation_blocked = run["phase"] == "blocked"
+        return progress.observe(run)
+    if action == "logs":
+        return progress.logs(
+            read_run(run_path()), check_name=required("check-name"), attempt=args.attempt, tail_bytes=args.tail_bytes
+        )
     if action == "explain":
         return diagnostics.explain(read_run(run_path()))
     if action == "summary":
@@ -149,6 +160,10 @@ def format_output(action: str, result: Any) -> str:
         )
     if action == "review-context":
         return review_context.format_bundle(result)
+    if action == "progress":
+        return progress.format_progress(result)
+    if action == "logs":
+        return progress.format_logs(result)
     if action == "explain":
         return diagnostics.format_report(result)
     if action == "summary":
@@ -205,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.json
             else format_output(args.command, result)
         )
+        if args.command == "progress":
+            return 2 if args.observation_blocked else 0
         if args.command == "explain":
             return diagnostics.exit_code(result)
         if args.command == "preflight":

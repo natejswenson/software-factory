@@ -20,6 +20,8 @@ checks freshness and observed delivery. It does not launch a model or daemon.
 | `preflight.py` | Read-only local readiness probes; advisory preparation, without task allocation or remote checks |
 | `diagnostics.py` | Read-only evidence comparisons and edits since saved proof, retaining engine gate decisions |
 | `review_context.py` | Bounded exact stage-specific review inputs and complete diff, without verdicts or persistence |
+| `ownership.py` | Shared read-only operation owner inspection without lock acquisition |
+| `progress.py` | Private verification observations and bounded read-only check log tails |
 | `summary.py` | Read-only human/JSON projection of recorded checks, findings, next action and delivery |
 | `validation.py` | Shared JSON integer compatibility checks |
 | `errors.py` | Structured factory errors and error codes |

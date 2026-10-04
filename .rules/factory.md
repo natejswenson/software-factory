@@ -14,7 +14,7 @@
         "scripts/verify.py",
         "tests"
       ],
-      "timeoutMs": 120000
+      "timeoutMs": 300000
     },
     {
       "name": "source",

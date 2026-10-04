@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from . import engine
-from .diagnostics import inspect_owner
+from .ownership import inspect_owner
 from .errors import FactoryError
 from .git import git_bytes
 from .store import Run, fingerprint

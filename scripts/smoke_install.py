@@ -99,8 +99,15 @@ def main() -> int:
         )
         cli("plan-review", "--run", directory, "--file", plan_review)
         (Path(status["worktree"]) / "value.txt").write_text("new\n")
+        assert cli("progress", "--run", directory)["status"] == "not-started"
         status = cli("verify", "--run", directory)
         assert status["verification"]["passed"]
+        observed = cli("progress", "--run", directory)
+        assert observed["status"] == "completed" and observed["attempt"] == 1
+        assert observed["checks"][0]["result"] == status["verification"]["results"][0]
+        tail = cli("logs", "--run", directory, "--check-name", "check1", "--tail-bytes", 8)
+        assert tail["bytesRead"] <= 8 and tail["logTruncated"] is False
+        assert tail["encoding"] == "utf-8 with replacement"
         explained = cli("explain", "--run", directory)
         assert explained["gates"]["verification"]["status"] == "current"
         assert explained["next"] == status["next"]

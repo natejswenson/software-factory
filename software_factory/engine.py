@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from . import prd
+from . import prd, progress
 from .checks import execute_check, validate_config
 from .errors import FactoryError
 from .git import assert_supported, assert_worktree, command, git, repository, snapshot
@@ -47,7 +47,9 @@ def init(repo: str, checks: list[dict[str, Any]]) -> dict[str, Any]:
     config = validate_config({"version": 1, "endpoint": "draft-pr", "checks": checks})
     path = root / ".rules" / "factory.md"
     if path.exists() or path.is_symlink():
-        raise FactoryError(".rules/factory.md already exists; inspect it before editing. Use prd-init for scaffold setup.")
+        raise FactoryError(
+            ".rules/factory.md already exists; inspect it before editing. Use prd-init for scaffold setup."
+        )
     scaffold = prd.prepare(root)
     created: list[str] = []
     try:
@@ -454,27 +456,42 @@ def verify(directory: str | Path) -> dict[str, Any]:
         run["checkAttempt"] += 1
         run["operation"] = {"kind": "verify", "evidence": before, "attempt": run["checkAttempt"]}
         save(run, "verify-intent")
-        results = []
-        for check in run["config"]["checks"]:
-            result = execute_check(check, run["worktree"], directory, run["checkAttempt"])
-            results.append(result)
-            if not result["passed"]:
-                break
-        after = evidence(run)
-        unchanged = same_evidence(before, after)
-        run["verification"] = {
-            "evidence": after,
-            "unchanged": unchanged,
-            "results": results,
-            "passed": unchanged
-            and len(results) == len(run["config"]["checks"])
-            and all(item["passed"] for item in results),
-            "at": now(),
-        }
-        atomic_json(Path(directory) / f"verification-{run['checkAttempt']}.json", run["verification"])
-        run["operation"] = None
-        run["phase"] = "review" if run["verification"]["passed"] else "implement"
-        save(run, "verified") if run["verification"]["passed"] else fail(run, "verify-failed")
+        observation = progress.Observation(run)
+        try:
+            results = []
+            for check in run["config"]["checks"]:
+                observation.begin(check["name"])
+                result = execute_check(check, run["worktree"], directory, run["checkAttempt"])
+                results.append(result)
+                observation.end(result)
+                if not result["passed"]:
+                    break
+            after = evidence(run)
+            unchanged = same_evidence(before, after)
+            run["verification"] = {
+                "evidence": after,
+                "unchanged": unchanged,
+                "results": results,
+                "passed": unchanged
+                and len(results) == len(run["config"]["checks"])
+                and all(item["passed"] for item in results),
+                "at": now(),
+            }
+            atomic_json(Path(directory) / f"verification-{run['checkAttempt']}.json", run["verification"])
+            run["operation"] = None
+            run["phase"] = "review" if run["verification"]["passed"] else "implement"
+            save(run, "verified") if run["verification"]["passed"] else fail(run, "verify-failed")
+            observation.finish(
+                "interrupted"
+                if any(item.get("error") == "Verification interrupted" for item in results)
+                else "completed"
+            )
+        except BaseException:
+            try:
+                observation.finish("interrupted")
+            except (OSError, FactoryError):
+                pass
+            raise
         return describe(run)
 
 
