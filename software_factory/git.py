@@ -15,6 +15,22 @@ from .errors import FactoryError
 from .store import Run
 
 
+def _kill_command_group(pid: int) -> None:
+    """Allow a short macOS group teardown race; preserve persistent failures."""
+    delays = iter((0.01, 0.02, 0.04))
+    while True:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            return
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            delay = next(delays, None)
+            if delay is None:
+                raise
+            time.sleep(delay)
+
+
 def command(
     argv: Sequence[str], cwd: str | Path, *, env: Mapping[str, str] | None = None, binary: bool = False
 ) -> str | bytes:
@@ -30,6 +46,7 @@ def command(
         )
         buffers = {"stdout": bytearray(), "stderr": bytearray()}
         deadline = time.monotonic() + 30
+        primary_error: BaseException | None = None
         try:
             with selectors.DefaultSelector() as selector:
                 for name in buffers:
@@ -56,15 +73,37 @@ def command(
                     raise FactoryError(f"{' '.join(argv[:2])}: {detail}", "infrastructure")
                 output = bytes(buffers["stdout"])
                 return output if binary else output.decode("utf-8", "surrogateescape")
+        except BaseException as error:
+            primary_error = error
+            raise
         finally:
+            cleanup_errors: list[str] = []
             try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            child.wait()
-            for pipe in (child.stdout, child.stderr):
-                if pipe is not None:
-                    pipe.close()
+                _kill_command_group(child.pid)
+            except OSError as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+                if child.poll() is None:
+                    try:
+                        child.kill()
+                    except OSError as child_error:
+                        cleanup_errors.append(f"child termination failed: {child_error}")
+            finally:
+                try:
+                    child.wait(timeout=1)
+                except (OSError, subprocess.SubprocessError) as wait_error:
+                    cleanup_errors.append(f"child wait failed: {wait_error}")
+                finally:
+                    for pipe in (child.stdout, child.stderr):
+                        if pipe is not None:
+                            try:
+                                pipe.close()
+                            except OSError as close_error:
+                                cleanup_errors.append(f"pipe close failed: {close_error}")
+            if cleanup_errors:
+                detail = "; ".join(cleanup_errors)
+                if primary_error is not None:
+                    detail = f"{primary_error}; process-group cleanup failed: {detail}"
+                raise FactoryError(f"{' '.join(argv[:2])}: {detail}", "infrastructure")
     except (OSError, subprocess.SubprocessError) as error:
         detail = getattr(error, "stderr", None)
         message = detail.decode("utf-8", "replace").strip() if isinstance(detail, bytes) else str(error)

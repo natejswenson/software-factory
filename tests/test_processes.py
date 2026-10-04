@@ -1,17 +1,373 @@
 """Real process groups: timeout, successful orphans, interrupts and bounded logs."""
 
 import json
+import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from unittest.mock import patch
 
+from software_factory import checks
 from software_factory.checks import execute_check
+from software_factory.errors import FactoryError
+from software_factory.git import command
 from tests.support import ROOT, FactoryCase
 
 
 class ProcessTests(FactoryCase):
+    def test_command_cleanup_does_not_claim_callers_exception(self):
+        f = self.fixture()
+        try:
+            raise RuntimeError("unrelated caller exception")
+        except RuntimeError:
+            with patch("software_factory.git.os.killpg", side_effect=PermissionError("cleanup denial")):
+                with self.assertRaises(FactoryError) as raised:
+                    command([sys.executable, "-c", "pass"], f.root)
+        self.assertIn("cleanup denial", str(raised.exception))
+        self.assertNotIn("unrelated caller exception", str(raised.exception))
+
+    def test_command_cleanup_failure_preserves_primary_and_reaps_child(self):
+        f = self.fixture()
+        children = []
+        original_popen = subprocess.Popen
+
+        def observed(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        started = time.monotonic()
+        with (
+            patch("software_factory.git.subprocess.Popen", side_effect=observed),
+            patch("software_factory.git.os.killpg", side_effect=PermissionError("persistent cleanup denial")),
+        ):
+            with self.assertRaisesRegex(
+                FactoryError, "output exceeds 8 MiB.*cleanup failed: persistent cleanup denial"
+            ):
+                command(
+                    [sys.executable, "-c", "import sys,time;sys.stdout.write('x'*(9*1024*1024));time.sleep(10)"], f.root
+                )
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(len(children), 1)
+        child = children[0]
+        self.assertIsNotNone(child.poll())
+        self.assertTrue(child.stdout.closed)
+        self.assertTrue(child.stderr.closed)
+
+    def test_command_cleanup_retries_transient_permission_failure(self):
+        f = self.fixture()
+        with (
+            patch(
+                "software_factory.git.os.killpg", side_effect=[PermissionError("transient"), ProcessLookupError()]
+            ) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            output = command([sys.executable, "-c", "print('complete')"], f.root)
+        self.assertEqual(output, "complete\n")
+        self.assertEqual(kill.call_count, 2)
+        self.assertEqual(kill.call_args_list[0], kill.call_args_list[1])
+        sleep.assert_called_once_with(0.01)
+
+    def test_command_cleanup_persistent_permission_failure_stays_failed(self):
+        f = self.fixture()
+        children = []
+        original_popen = subprocess.Popen
+
+        def observed(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        with (
+            patch("software_factory.git.subprocess.Popen", side_effect=observed),
+            patch("software_factory.git.os.killpg", side_effect=PermissionError("persistent cleanup denial")) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(FactoryError, "persistent cleanup denial") as raised:
+                command([sys.executable, "-c", "pass"], f.root)
+        self.assertEqual(raised.exception.code, "infrastructure")
+        self.assertEqual(kill.call_count, 4)
+        self.assertEqual([call.args for call in sleep.call_args_list], [(0.01,), (0.02,), (0.04,)])
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].poll())
+        self.assertTrue(children[0].stdout.closed)
+        self.assertTrue(children[0].stderr.closed)
+
+    def test_command_cleanup_success_is_not_repeated(self):
+        f = self.fixture()
+        with patch("software_factory.git.os.killpg") as kill, patch("software_factory.git.time.sleep") as sleep:
+            self.assertEqual(command([sys.executable, "-c", "print('ok')"], f.root), "ok\n")
+        kill.assert_called_once()
+        self.assertEqual(kill.call_args.args[1], signal.SIGKILL)
+        sleep.assert_not_called()
+
+    def test_command_cleanup_absent_group_is_not_retried(self):
+        f = self.fixture()
+        with (
+            patch("software_factory.git.os.killpg", side_effect=ProcessLookupError()) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            self.assertEqual(command([sys.executable, "-c", "pass"], f.root), "")
+        kill.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_command_cleanup_other_errors_are_not_retried(self):
+        f = self.fixture()
+        with (
+            patch("software_factory.git.os.killpg", side_effect=OSError("other cleanup failure")) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(FactoryError, "other cleanup failure"):
+                command([sys.executable, "-c", "pass"], f.root)
+        kill.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_command_success_cleans_background_descendant(self):
+        f = self.fixture()
+        target = f.root / "command-orphan.txt"
+        writer = f"import time;from pathlib import Path;time.sleep(1);Path({str(target)!r}).write_text('orphan')"
+        script = (
+            "import subprocess,sys;"
+            f"subprocess.Popen([sys.executable,'-c',{writer!r}], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);"
+            "print('parent complete')"
+        )
+        self.assertEqual(command([sys.executable, "-c", script], f.root), "parent complete\n")
+        time.sleep(1.1)
+        self.assertFalse(target.exists())
+
+    def test_interrupt_after_completed_kill_defers_reentry(self):
+        for worker_signal in (False, True):
+            with self.subTest(worker_signal=worker_signal):
+                f = self.fixture()
+                script, target = self.parent(f.root, exit_early=True, inherited_pipes=True)
+                original_kill, original_signal = os.killpg, signal.signal
+                handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+                old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, set())
+                calls, observed = [], threading.Event()
+                ready, stop = threading.Event(), threading.Event()
+
+                def worker():
+                    previous = signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})
+                    try:
+                        ready.set()
+                        stop.wait(5)
+                    finally:
+                        signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+
+                thread = threading.Thread(target=worker)
+                if worker_signal:
+                    thread.start()
+
+                def install(sig, handler):
+                    if getattr(handler, "__name__", "") == "interrupted":
+
+                        def received(signum, frame):
+                            observed.set()
+                            handler(signum, frame)
+
+                        return original_signal(sig, received)
+                    return original_signal(sig, handler)
+
+                def completed(pid, sig):
+                    calls.append(sig)
+                    if len(calls) > 1:
+                        raise PermissionError("synthetic repeated completed kill")
+                    original_kill(pid, sig)
+                    if worker_signal:
+                        signal.pthread_kill(thread.ident, signal.SIGTERM)
+                    else:
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    deadline = time.monotonic() + 2
+                    while not observed.is_set() and time.monotonic() < deadline:
+                        time.sleep(0.005)
+                    self.assertTrue(observed.is_set(), "Real handler must run before the syscall wrapper returns")
+
+                try:
+                    if worker_signal:
+                        self.assertTrue(ready.wait(2))
+                    with (
+                        patch.object(checks.os, "killpg", side_effect=completed),
+                        patch.object(checks.signal, "signal", side_effect=install),
+                    ):
+                        result = execute_check(
+                            {"name": "completed-kill", "argv": [sys.executable, str(script)], "timeoutMs": 2000},
+                            f.root,
+                            f.root,
+                            1,
+                        )
+                finally:
+                    stop.set()
+                    if worker_signal:
+                        thread.join(2)
+                        self.assertFalse(thread.is_alive())
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["error"], "Verification interrupted")
+                self.assertEqual(calls, [signal.SIGKILL])
+                self.assertNotIn("cleanupErrors", result)
+                self.assertEqual(signal.pthread_sigmask(signal.SIG_BLOCK, set()), old_mask)
+                self.assertEqual({sig: signal.getsignal(sig) for sig in handlers}, handlers)
+                time.sleep(1.1)
+                self.assertFalse(target.exists())
+
+    def test_nested_interrupt_cannot_clear_successful_group_kill(self):
+        f = self.fixture()
+        script, target = self.parent(f.root)
+        original_kill, calls = os.killpg, []
+        handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+
+        def nested(pid, sig):
+            calls.append(sig)
+            if sig == signal.SIGTERM:
+                # Deliver a real interruption inside the outer cleanup operation.
+                os.kill(os.getpid(), signal.SIGTERM)
+                return None
+            if calls.count(signal.SIGKILL) > 1:
+                raise PermissionError("synthetic repeated terminal kill")
+            return original_kill(pid, sig)
+
+        with patch.object(checks.os, "killpg", side_effect=nested):
+            result = execute_check(
+                {"name": "nested", "argv": [sys.executable, str(script)], "timeoutMs": 150},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertFalse(result["passed"])
+        self.assertTrue(result["timedOut"])
+        self.assertEqual(result["error"], "Verification interrupted")
+        self.assertEqual(calls, [signal.SIGTERM, signal.SIGKILL])
+        self.assertNotIn("cleanupErrors", result)
+        self.assertEqual({sig: signal.getsignal(sig) for sig in handlers}, handlers)
+        time.sleep(1.1)
+        self.assertFalse(target.exists())
+
+    def test_successful_group_kill_is_not_repeated_after_parent_exit(self):
+        f = self.fixture()
+        script, target = self.parent(f.root, exit_early=True, inherited_pipes=True)
+        original_kill, calls = os.killpg, []
+
+        def kill_once(pid, sig):
+            calls.append(sig)
+            if len(calls) > 1:
+                raise PermissionError("synthetic already-killed group")
+            return original_kill(pid, sig)
+
+        with patch.object(checks.os, "killpg", side_effect=kill_once):
+            result = execute_check(
+                {"name": "kill-once", "argv": [sys.executable, str(script)], "timeoutMs": 2000},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(calls, [signal.SIGKILL])
+        self.assertNotIn("cleanupErrors", result)
+        time.sleep(1.1)
+        self.assertFalse(target.exists())
+
+    def test_absent_group_is_not_signalled_again(self):
+        f = self.fixture()
+        calls = []
+
+        def absent(pid, sig):
+            calls.append(sig)
+            raise ProcessLookupError("synthetic absent group")
+
+        with patch.object(checks.os, "killpg", side_effect=absent):
+            result = execute_check(
+                {"name": "absent", "argv": [sys.executable, "-c", "pass"], "timeoutMs": 2000},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(calls, [signal.SIGKILL])
+        self.assertNotIn("error", result)
+
+    def test_sigterm_still_escalates_to_group_sigkill(self):
+        f = self.fixture()
+        script, target = self.parent(f.root)
+        script.write_text("import signal\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\n" + script.read_text())
+        original_kill, calls = os.killpg, []
+
+        def observed(pid, sig):
+            calls.append(sig)
+            return original_kill(pid, sig)
+
+        with patch.object(checks.os, "killpg", side_effect=observed):
+            result = execute_check(
+                {"name": "escalate", "argv": [sys.executable, str(script)], "timeoutMs": 150},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertFalse(result["passed"])
+        self.assertTrue(result["timedOut"])
+        self.assertEqual(calls[0], signal.SIGTERM)
+        self.assertIn(signal.SIGKILL, calls[1:])
+        self.assertEqual(calls.count(signal.SIGKILL), 1)
+        time.sleep(1.1)
+        self.assertFalse(target.exists())
+
+    def test_disposable_fixture_disables_background_git_maintenance(self):
+        f = self.fixture()
+        for setting, expected in [("maintenance.auto", "false"), ("gc.auto", "0")]:
+            actual = subprocess.check_output(["git", "config", "--get", setting], cwd=f.repo, text=True)
+            self.assertEqual(actual.strip(), expected)
+
+    def test_cleanup_permission_diagnostics_preserve_primary_interrupt(self):
+        f = self.fixture()
+        original_signal, original_kill = signal.signal, os.killpg
+        handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+        denied = False
+        kill_calls = []
+
+        def kill_once(pid, sig):
+            nonlocal denied
+            kill_calls.append(sig)
+            if not denied:
+                denied = True
+                raise PermissionError("synthetic cleanup denial")
+            return original_kill(pid, sig)
+
+        def install(sig, handler):
+            previous = original_signal(sig, handler)
+            if sig == signal.SIGTERM and getattr(handler, "__name__", "") == "interrupted":
+                handler(sig, None)
+            return previous
+
+        with (
+            patch.object(checks.os, "killpg", side_effect=kill_once),
+            patch.object(checks.signal, "signal", side_effect=install),
+        ):
+            result = execute_check(
+                {"name": "interrupt-denial", "argv": [sys.executable, "-c", "pass"], "timeoutMs": 2000},
+                f.root,
+                f.root,
+                1,
+            )
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["error"], "Verification interrupted")
+        self.assertEqual(result["cleanupErrors"], ["synthetic cleanup denial"])
+        self.assertEqual(kill_calls, [signal.SIGKILL, signal.SIGKILL])
+        self.assertEqual({sig: signal.getsignal(sig) for sig in handlers}, handlers)
+
+    def test_cleanup_only_permission_failure_still_fails_check(self):
+        f = self.fixture()
+        old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, set())
+        with patch.object(checks.os, "killpg", side_effect=PermissionError("synthetic cleanup denial")):
+            result = execute_check(
+                {"name": "cleanup-denial", "argv": [sys.executable, "-c", "pass"], "timeoutMs": 2000}, f.root, f.root, 1
+            )
+        self.assertEqual(result["exitCode"], 0)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["error"], "synthetic cleanup denial")
+        self.assertTrue(result["cleanupErrors"])
+        self.assertEqual(signal.pthread_sigmask(signal.SIG_BLOCK, set()), old_mask)
+
     def parent(self, root, *, exit_early=False, inherited_pipes=False):
         target = root / "orphan.txt"
         script = root / "parent.py"
