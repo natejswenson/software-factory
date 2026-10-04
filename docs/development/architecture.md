@@ -18,6 +18,7 @@ checks freshness and observed delivery. It does not launch a model or daemon.
 | `store.py` | Canonical version-1 hashing, private atomic JSON, run identity/history and operation locks |
 | `delivery.py` | Exact reviewed commit, remote head observation and idempotent draft PR reconciliation |
 | `preflight.py` | Read-only local readiness probes; advisory preparation, without task allocation or remote checks |
+| `diagnostics.py` | Read-only evidence comparisons and edits since saved proof, retaining engine gate decisions |
 | `summary.py` | Read-only human/JSON projection of recorded checks, findings, next action and delivery |
 | `validation.py` | Shared JSON integer compatibility checks |
 | `errors.py` | Structured factory errors and error codes |

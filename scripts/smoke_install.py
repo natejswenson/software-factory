@@ -98,6 +98,10 @@ def main() -> int:
         (Path(status["worktree"]) / "value.txt").write_text("new\n")
         status = cli("verify", "--run", directory)
         assert status["verification"]["passed"]
+        explained = cli("explain", "--run", directory)
+        assert explained["gates"]["verification"]["status"] == "current"
+        assert explained["next"] == status["next"]
+        assert explained["changedPaths"]["paths"] == []
         review = directory / "synthetic-review.json"
         review.write_text(
             json.dumps(
@@ -113,6 +117,7 @@ def main() -> int:
         cli("review", "--run", directory, "--file", review)
         done = cli("deliver", "--run", directory)
         assert done["phase"] == "done"
+        assert cli("explain", "--run", directory)["delivery"] == done["delivery"]
         assert cli("summary", "--run", directory)["delivery"] == done["delivery"]
         skill = Path(cli("skill-path"))
         assert skill.is_relative_to(Path(sys.prefix))

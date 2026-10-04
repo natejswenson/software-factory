@@ -1,5 +1,6 @@
 """Exact, read-only CLI summaries across task and delivery states."""
 
+import json
 import os
 import socket
 import sys
@@ -174,3 +175,15 @@ class SummaryTests(FactoryCase):
         self.assertEqual(complete["delivery"], run["delivery"])
         self.assertIn(run["delivery"]["pr"], self.summary(run, human=True))
         self.assertEqual(complete["next"]["action"], "done")
+
+    def test_explain_keeps_historical_summary_and_exact_projection(self):
+        run = self.reviewed(self.fixture())
+        (Path(run["worktree"]) / "changed-after-proof").write_text("drift")
+        before = self.summary(run)
+        output = self.cli("explain", "--run", run["run"], "--json")
+        self.assertEqual(output.returncode, 0, output.stderr)
+        explanation = json.loads(output.stdout)
+        self.assertEqual(explanation["next"]["action"], before["next"]["action"])
+        self.assertEqual(explanation["gates"]["verification"]["status"], "stale")
+        self.assertTrue(before["verification"]["passed"])
+        self.assertEqual(self.summary(run), before)

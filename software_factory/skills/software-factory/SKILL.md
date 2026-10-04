@@ -104,6 +104,11 @@ the current next action and delivery; use `next --json` for artifact freshness.
 ## Drive the loop
 
 After each step call `next --run <run> --json` and carry out its next action.
+Use `explain --run <run> --json` when proof is missing or stale: it separates
+historical verdicts from freshness, lists fingerprint differences and edits since
+the saved proof, and reports the authoritative next action. Unknown inspection
+or live-owner wait is observational; never repair receipts or bypass gates.
+
 Check both `phase` and `next`: failed checks return exit 2 with valid JSON and
 failed evidence. Keep concise factual progress updates during long work.
 
