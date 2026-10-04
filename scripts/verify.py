@@ -2,6 +2,7 @@
 
 import argparse
 import ast
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -9,12 +10,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_project() -> int:
+class TestResults(unittest.TextTestResult):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.passed = []
+
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        self.passed.append(test.id())
+
+
+def test_project(report: Path | None = None) -> int:
     sys.path.insert(0, str(ROOT))
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"), top_level_dir=str(ROOT))
     if suite.countTestCases() == 0:
         raise RuntimeError("No tests discovered.")
-    return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
+    result = unittest.TextTestRunner(verbosity=2, resultclass=TestResults).run(suite)
+    if report:
+        report.write_text(json.dumps(result.passed))
+    return 0 if result.wasSuccessful() else 1
 
 
 def check_source() -> int:
@@ -34,8 +48,9 @@ def check_source() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("check", choices=("tests", "source"))
+    parser.add_argument("--test-report", type=Path)
     args = parser.parse_args()
-    return test_project() if args.check == "tests" else check_source()
+    return test_project(args.test_report) if args.check == "tests" else check_source()
 
 
 if __name__ == "__main__":
