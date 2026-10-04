@@ -62,6 +62,8 @@ reports local readiness without starting a task. Actual start/check/review/deliv
 gates still apply; remote readiness remains unverified offline.
 Use `factory explain --run /path/to/run` to see which proof became stale and
 which files changed since the saved verification.
+`factory review-context --run /path/to/run --stage code --json` prepares complete
+inputs for your native reviewer after verification; the reviewer supplies judgment.
 
 ## Read more
 

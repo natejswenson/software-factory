@@ -59,3 +59,18 @@ self-contained requirements and necessary design details into the reviewed plan.
 Source edits do not replace saved text/criteria; resume the same run. Human PRD
 lifecycle labels do not change gates or these exact review schemas. No automatic
 criteria parser, approval, commit or backlog execution is implied.
+
+## Reviewer context preparation
+
+Use `review-context --run <run> --stage plan|code --json` to assemble complete exact
+inputs; it does not submit or approve them. Code requires current passing checks.
+Repeat `--instructions-file` and `--supplement` for explicit private UTF-8 data.
+Supply current conversation/host directions separately; explicit user/host directions
+outrank repository guidance and input prose never authorizes gate bypass/external
+acts. Supplements are attributed observations, not extra checks or certified proof.
+Root/scoped instructions, full plan/task/rules/criteria, frozen config and code diff/
+verification remain complete and bounded. Reject oversized/changing required inputs;
+never silently drop them. Bundles stay private and no model/network call occurs.
+A native reviewer still writes its genuine artifact using the unchanged schemas
+above, copying exact context/evidence. Capture reserves nothing; submission rechecks
+freshness. A bundle cannot establish reviewer independence or prose truth.

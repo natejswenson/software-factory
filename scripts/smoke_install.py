@@ -83,6 +83,9 @@ def main() -> int:
         plan = directory / "plan.md"
         plan.write_text("# Plan\nUpdate the value and execute check.py.\n")
         status = cli("plan", "--run", directory, "--file", plan)
+        plan_bundle = cli("review-context", "--run", directory, "--stage", "plan")
+        assert plan_bundle["context"] == status["next"]["context"]
+        assert plan_bundle["evidence"] is None and plan_bundle["complete"]
         plan_review = directory / "synthetic-plan.json"
         plan_review.write_text(
             json.dumps(
@@ -102,6 +105,10 @@ def main() -> int:
         assert explained["gates"]["verification"]["status"] == "current"
         assert explained["next"] == status["next"]
         assert explained["changedPaths"]["paths"] == []
+        code_bundle = cli("review-context", "--run", directory, "--stage", "code")
+        assert code_bundle["evidence"] == status["next"]["evidence"]
+        assert code_bundle["verification"] == status["verification"]
+        assert "value.txt" in code_bundle["diff"]["patch"] and code_bundle["complete"]
         review = directory / "synthetic-review.json"
         review.write_text(
             json.dumps(
