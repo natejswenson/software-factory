@@ -132,6 +132,19 @@ def require_release(repo: str, tag: str) -> dict:
     return record
 
 
+def should_mark_latest(repo: str, version: str) -> bool:
+    candidate = TAG.fullmatch(f"v{version}")
+    if candidate is None:
+        raise ValueError("A stable release version is required.")
+    latest = api(f"repos/{repo}/releases/latest", missing=True)
+    if latest is None:
+        return True
+    observed = TAG.fullmatch(latest["tag_name"])
+    if observed is None:
+        raise ValueError("Latest release has an unexpected version; inspect before publishing.")
+    return tuple(map(int, candidate.groups())) >= tuple(map(int, observed.groups()))
+
+
 def verify_published(repo: str, tag: str, version: str, release: dict) -> None:
     expected = {f"software_factory-{version}-py3-none-any.whl", f"software_factory-{version}.tar.gz", "SHA256SUMS"}
     if {asset["name"] for asset in release["assets"]} != expected:
@@ -182,7 +195,8 @@ def publish(repo: str, commit: str, version: str, directory: Path) -> dict[str, 
     command("gh", "release", "upload", tag, "--repo", repo, "--clobber", *map(str, [*assets, checksum]))
     release = require_release(repo, tag)
     verify_published(repo, tag, version, release)
-    command("gh", "release", "edit", tag, "--repo", repo, "--draft=false")
+    latest = "true" if should_mark_latest(repo, version) else "false"
+    command("gh", "release", "edit", tag, "--repo", repo, "--draft=false", f"--latest={latest}")
     release = require_release(repo, tag)
     if release["draft"] or tag_commit(repo, tag) != commit:
         raise ValueError("Published release was not observed at the tested commit.")
