@@ -12,10 +12,132 @@ from unittest.mock import patch
 
 from software_factory import checks
 from software_factory.checks import execute_check
+from software_factory.errors import FactoryError
+from software_factory.git import command
 from tests.support import ROOT, FactoryCase
 
 
 class ProcessTests(FactoryCase):
+    def test_command_cleanup_does_not_claim_callers_exception(self):
+        f = self.fixture()
+        try:
+            raise RuntimeError("unrelated caller exception")
+        except RuntimeError:
+            with patch("software_factory.git.os.killpg", side_effect=PermissionError("cleanup denial")):
+                with self.assertRaises(FactoryError) as raised:
+                    command([sys.executable, "-c", "pass"], f.root)
+        self.assertIn("cleanup denial", str(raised.exception))
+        self.assertNotIn("unrelated caller exception", str(raised.exception))
+
+    def test_command_cleanup_failure_preserves_primary_and_reaps_child(self):
+        f = self.fixture()
+        children = []
+        original_popen = subprocess.Popen
+
+        def observed(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        started = time.monotonic()
+        with (
+            patch("software_factory.git.subprocess.Popen", side_effect=observed),
+            patch("software_factory.git.os.killpg", side_effect=PermissionError("persistent cleanup denial")),
+        ):
+            with self.assertRaisesRegex(
+                FactoryError, "output exceeds 8 MiB.*cleanup failed: persistent cleanup denial"
+            ):
+                command(
+                    [sys.executable, "-c", "import sys,time;sys.stdout.write('x'*(9*1024*1024));time.sleep(10)"], f.root
+                )
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(len(children), 1)
+        child = children[0]
+        self.assertIsNotNone(child.poll())
+        self.assertTrue(child.stdout.closed)
+        self.assertTrue(child.stderr.closed)
+
+    def test_command_cleanup_retries_transient_permission_failure(self):
+        f = self.fixture()
+        with (
+            patch(
+                "software_factory.git.os.killpg", side_effect=[PermissionError("transient"), ProcessLookupError()]
+            ) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            output = command([sys.executable, "-c", "print('complete')"], f.root)
+        self.assertEqual(output, "complete\n")
+        self.assertEqual(kill.call_count, 2)
+        self.assertEqual(kill.call_args_list[0], kill.call_args_list[1])
+        sleep.assert_called_once_with(0.01)
+
+    def test_command_cleanup_persistent_permission_failure_stays_failed(self):
+        f = self.fixture()
+        children = []
+        original_popen = subprocess.Popen
+
+        def observed(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        with (
+            patch("software_factory.git.subprocess.Popen", side_effect=observed),
+            patch("software_factory.git.os.killpg", side_effect=PermissionError("persistent cleanup denial")) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(FactoryError, "persistent cleanup denial") as raised:
+                command([sys.executable, "-c", "pass"], f.root)
+        self.assertEqual(raised.exception.code, "infrastructure")
+        self.assertEqual(kill.call_count, 4)
+        self.assertEqual([call.args for call in sleep.call_args_list], [(0.01,), (0.02,), (0.04,)])
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].poll())
+        self.assertTrue(children[0].stdout.closed)
+        self.assertTrue(children[0].stderr.closed)
+
+    def test_command_cleanup_success_is_not_repeated(self):
+        f = self.fixture()
+        with patch("software_factory.git.os.killpg") as kill, patch("software_factory.git.time.sleep") as sleep:
+            self.assertEqual(command([sys.executable, "-c", "print('ok')"], f.root), "ok\n")
+        kill.assert_called_once()
+        self.assertEqual(kill.call_args.args[1], signal.SIGKILL)
+        sleep.assert_not_called()
+
+    def test_command_cleanup_absent_group_is_not_retried(self):
+        f = self.fixture()
+        with (
+            patch("software_factory.git.os.killpg", side_effect=ProcessLookupError()) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            self.assertEqual(command([sys.executable, "-c", "pass"], f.root), "")
+        kill.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_command_cleanup_other_errors_are_not_retried(self):
+        f = self.fixture()
+        with (
+            patch("software_factory.git.os.killpg", side_effect=OSError("other cleanup failure")) as kill,
+            patch("software_factory.git.time.sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(FactoryError, "other cleanup failure"):
+                command([sys.executable, "-c", "pass"], f.root)
+        kill.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_command_success_cleans_background_descendant(self):
+        f = self.fixture()
+        target = f.root / "command-orphan.txt"
+        writer = f"import time;from pathlib import Path;time.sleep(1);Path({str(target)!r}).write_text('orphan')"
+        script = (
+            "import subprocess,sys;"
+            f"subprocess.Popen([sys.executable,'-c',{writer!r}], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);"
+            "print('parent complete')"
+        )
+        self.assertEqual(command([sys.executable, "-c", script], f.root), "parent complete\n")
+        time.sleep(1.1)
+        self.assertFalse(target.exists())
+
     def test_interrupt_after_completed_kill_defers_reentry(self):
         for worker_signal in (False, True):
             with self.subTest(worker_signal=worker_signal):
