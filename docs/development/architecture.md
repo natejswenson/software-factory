@@ -22,6 +22,7 @@ checks freshness and observed delivery. It does not launch a model or daemon.
 | `review_context.py` | Bounded exact stage-specific review inputs and complete diff, without verdicts or persistence |
 | `ownership.py` | Shared read-only operation owner inspection without lock acquisition |
 | `progress.py` | Private verification observations and bounded read-only check log tails |
+| `history.py` | Tolerant bounded saved-run discovery, event pages and recorded attempt metrics |
 | `summary.py` | Read-only human/JSON projection of recorded checks, findings, next action and delivery |
 | `validation.py` | Shared JSON integer compatibility checks |
 | `errors.py` | Structured factory errors and error codes |

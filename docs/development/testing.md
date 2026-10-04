@@ -153,3 +153,16 @@ The repository tests check allows 300000ms for the expanding real-process suite
 (actual 140-test suite took about 101s against its prior 120s limit). The command and
 all assertions remain unchanged; source still allows 30000ms. An active task always
 uses its original frozen settings: a reviewed rules edit affects subsequent runs.
+
+## Run discovery and history
+
+`tests/test_history.py` creates real multiple runs and distinct failed/repaired
+verification receipts. It asserts recency/fallback/ties, filtering before limits,
+append-order stable event indices across clock reversal, pages, skipped checks and
+missing timings/receipts. Invalid neighbors, missing worktrees, historical branches,
+foreign/live/malformed locks, bounded counters and files, directory-open races and
+symlink descendants retain explicit errors. Discovery/history preserve saved bytes,
+source/index/HEAD, locks and worktree inventory. Legacy list and strict allocation
+still reject malformed ledgers. The read-only captured-plan adapter uses a sentinel
+for explicit absence; mutation gates retain live plan reads. Installed smoke uses
+both commands and compares retained verification details.
