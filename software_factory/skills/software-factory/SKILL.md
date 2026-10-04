@@ -157,6 +157,21 @@ cover every criterion and contain no unresolved major/blocking finding.
 
 ## Interruptions and delivery
 
+After passing verification, optionally author a private description JSON with version 1,
+the complete current `next.evidence`, a single-line title, 1–5 summary paragraphs and
+optional compatibility/risks strings. Run `pr-description --run <run> --file <input>`;
+inspect the full preview and pass its private file as an explicit code-review supplement.
+Ground prose in final behavior, preserve literal text and keep private paths out of
+prose/criteria. Prose is agent-authored; binding proves freshness, not truth. Generated
+sections retain all criteria and actual check outcomes/durations/portable argv, withholding
+host commands with a private-verification note. Read the actual private command receipt.
+Input is bounded to 16 KiB, custom body 48 KiB; shorten prose, never truncate criteria.
+Submission preserves proof/budget and cannot approve code. It is refused after operation/
+commit/delivery intent. Missing or changed selected artifacts are errors, never default
+fallback. Owned-commit retries retain immutable presentation/body and reconcile an existing
+matching draft without metadata edits. Without input, original defaults remain unchanged.
+See the protocol for exact fields; delivery still requires current passing code review.
+
 Preserve the run path in your handoff. A failed push/PR creation leaves the
 verified commit and operation intent; `next` selects delivery recovery. Retry
 `deliver` after access returns; it reconciles an existing PR before creating one.

@@ -246,3 +246,58 @@ required per-run inspection errors return 2 with a partial report; top-level
 infrastructure failure returns 3. The strict `list` and task-allocation readers
 retain their original behavior. Select a run explicitly and use normal resume/
 recovery rules; inventories cannot repair a ledger or certify current delivery.
+
+## Concise PR descriptions
+
+After verification, author a private UTF-8 JSON file with these fields:
+
+- `version`: 1.
+- `evidence`: the complete object from current verified `next.evidence`, including paths.
+- `title`: a trimmed single line of 1–150 characters, without control characters.
+- `summary`: 1–5 nonempty paragraph strings grounded in the final behavior.
+- Optional `compatibility` and `risks`: strings describing actual limitations or behavior.
+
+```sh
+factory pr-description --run /path/to/run --file /path/to/description.json --json
+```
+
+Input permits only those keys and is limited to 16 KiB. Duplicate keys, invalid
+UTF-8, symlinks, nonregular files and malformed JSON are rejected. Literal Markdown,
+Unicode, backticks and `$()` text remain literal; no summarizing model or shell runs.
+JSON returns version/id/title, private presentation/previewFile paths, full preview,
+evidenceHash and changed. Human output shows the title and complete preview.
+
+Inspect the preview before delivery and supply it to the native code reviewer as an
+explicit supplement. Summary/compatibility/risks are labeled agent-authored prose;
+evidence binding establishes freshness, not prose truth. The engine generates every
+numbered criterion verbatim plus recorded check names, outcomes, duration when
+available and portable argv. Commands containing absolute host paths are withheld
+with a private-verification note. Review the actual private receipt for those checks.
+The custom body does not copy the full task, raw logs or saved task state.
+
+Preview names the reviewed tree. Publication also names the actual observed commit.
+Custom rendered bodies are limited to 48 KiB of UTF-8; oversized content is rejected
+before writes/publication, never silently truncated. Keep private paths out of your
+prose and criteria. Existing tasks without presentation retain their exact default
+title/body behavior, with no new body limit or required metadata.
+
+Submission requires a prepared active run with current passing verification; code
+review may precede or follow it. It changes no proof, identity or repair count and
+cannot approve code. Invalid/stale metadata returns 2; infrastructure failure 3.
+Private presentation and preview are atomically written with mode 0600 before the
+state reference/history event. Identical submission changes neither state nor history;
+an absent derived preview can be regenerated without another event. An interrupted
+unreferenced payload can be validated and explicitly resubmitted using the same input.
+
+Metadata is refused once any operation, commit intent or delivery exists. Delivery
+validates the selected artifact before committing and freezes its hash in the intent.
+The final body hash is recorded before push/create. Retries validate both; missing,
+changed or stale referenced artifacts are errors, without default fallback. An engine
+owned commit uses the original verified evidence during recovery. Inspect/correct
+metadata before delivery begins; after immutable selection, preserve the attempt.
+
+An existing matching open draft is reconciled without creating another PR or editing
+its title/body. Optional delivery presentation outcome reports `applied-by-create`
+or `reconciled-existing`; uncertain creation followed by reconciliation is not claimed
+as a newly applied description. Head/base/draft checks, executable checks and current
+code review remain mandatory. Local endpoints retain normal commit delivery.

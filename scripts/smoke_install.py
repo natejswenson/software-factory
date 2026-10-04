@@ -116,6 +116,21 @@ def main() -> int:
         assert code_bundle["evidence"] == status["next"]["evidence"]
         assert code_bundle["verification"] == status["verification"]
         assert "value.txt" in code_bundle["diff"]["patch"] and code_bundle["complete"]
+        prose = directory / "synthetic-description.json"
+        prose.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "evidence": status["next"]["evidence"],
+                    "title": "Installed presentation test",
+                    "summary": ["Change the synthetic value and retain verified delivery."],
+                }
+            )
+        )
+        preview = cli("pr-description", "--run", directory, "--file", prose)
+        assert preview["changed"] and "value contains new" in preview["preview"]
+        assert "## Task" not in preview["preview"]
+        assert not cli("pr-description", "--run", directory, "--file", prose)["changed"]
         review = directory / "synthetic-review.json"
         review.write_text(
             json.dumps(
@@ -131,6 +146,8 @@ def main() -> int:
         cli("review", "--run", directory, "--file", review)
         done = cli("deliver", "--run", directory)
         assert done["phase"] == "done"
+        state = json.loads((directory / "state.json").read_text())
+        assert state["commitIntent"]["presentationHash"] == state["prPresentation"]["hash"]
         assert cli("explain", "--run", directory)["delivery"] == done["delivery"]
         assert cli("summary", "--run", directory)["delivery"] == done["delivery"]
         inventory = cli("runs", "--repo", repo)

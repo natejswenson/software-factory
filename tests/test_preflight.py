@@ -15,6 +15,15 @@ from tests.support import FactoryCase
 
 
 class PreflightTests(FactoryCase):
+    def test_disposable_fixture_disables_background_maintenance_without_weakening_snapshot(self):
+        f = self.fixture()
+        self.assertEqual(git(f.repo, ["config", "--get", "maintenance.auto"]).strip(), "false")
+        self.assertEqual(git(f.repo, ["config", "--get", "gc.auto"]).strip(), "0")
+        before = self.files_snapshot(f.root)
+        report = preflight.inspect(str(f.repo), str(f.root / "unused"))
+        self.assertTrue(report["ready"])
+        self.assertEqual(self.files_snapshot(f.root), before)
+
     def report(self, fixture, **options):
         return preflight.inspect(str(fixture.repo), str(fixture.root / "absent parents/worktrees"), **options)
 
