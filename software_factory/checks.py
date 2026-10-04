@@ -114,6 +114,7 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
             kill_at = None
             parent_finished = False
             written = 0
+            flushed_at = time.monotonic()
             with selectors.DefaultSelector() as selector:
                 for pipe in (child.stdout, child.stderr):
                     assert pipe is not None
@@ -121,6 +122,9 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
                     selector.register(pipe, selectors.EVENT_READ)
                 while selector.get_map() or child.poll() is None:
                     current = time.monotonic()
+                    if current - flushed_at >= 0.1:
+                        output.flush()
+                        flushed_at = current
                     if child.poll() is not None and not parent_finished:
                         parent_finished = True
                         # A successful check must not retain inherited pipes/background writers.
@@ -142,6 +146,7 @@ def execute_check(check: dict[str, Any], cwd: str | Path, directory: str | Path,
                         output.write(chunk[:size])
                         written += size
                         result["truncated"] |= size < len(chunk)
+                output.flush()
                 code = child.wait()
                 if code < 0:
                     result["signal"] = signal.Signals(-code).name

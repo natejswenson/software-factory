@@ -137,3 +137,19 @@ while retaining explicit path semantics. Non-UTF-8 Git patch
 bytes round-trip through JSON; human output spells surrogate escapes explicitly.
 State, receipts, source/index/HEAD and legacy schemas stay intact. Installed smoke
 exercises both stages and compares their exact values with the real lifecycle.
+
+## Verification observations
+
+`tests/test_progress.py` synchronizes real verifier/check processes to prove active
+attempt/check identity, completed/pending order, early small-output flushing and
+read-only state/receipt/lock/source/index/HEAD behavior. SIGTERM retains the real
+failed receipt/budget and interrupted observation. Tests cover fail-fast/skipped
+checks, legacy/stale/malformed sidecars, dead/foreign/mismatched ownership, clock
+clamping, changing snapshots, bounded/replacement log tails, unsafe files and
+invalid attempts. Existing process cleanup/timeouts and summary regressions run
+in the same suite. Installed smoke exercises both observations with the package.
+
+The repository tests check allows 300000ms for the expanding real-process suite
+(actual 140-test suite took about 101s against its prior 120s limit). The command and
+all assertions remain unchanged; source still allows 30000ms. An active task always
+uses its original frozen settings: a reviewed rules edit affects subsequent runs.

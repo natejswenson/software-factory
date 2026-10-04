@@ -166,3 +166,42 @@ patch bytes with surrogate escapes; readable output shows escaped spelling. Unsa
 missing, oversized or changing inputs fail clearly. Another owner prevents capture.
 Correct inputs or obtain fresh verification and retry; nothing reserves the tree.
 Errors retain normal invalid/gate exit2 and infrastructure exit3 conventions.
+
+## Observe verification and check logs
+
+```sh
+factory progress --run /path/to/run --json
+factory logs --run /path/to/run --check-name tests --tail-bytes 8192 --json
+factory logs --run /path/to/run --check-name tests --attempt 1
+```
+
+A separate process can observe the latest attempt while verification owns the
+lock. Progress labels not-started, running, completed, interrupted or unknown;
+each frozen check is pending, running, passed, failed, skipped or unknown. It
+includes owner, active check, elapsed milliseconds and available exact results.
+Completed means the attempt finished; check outcomes still matter. Matching saved
+final results take precedence over stale sidecars. Historical runs need no sidecar;
+an incomplete intent with missing/corrupt observations stays unknown.
+
+The owner writes private atomic mode 0600 `verification-progress.json` transitions
+outside source. Reader snapshots verify attempt/run/owner correspondence and reject
+changes during capture; retry after a transition. Same-host dead owners are labeled
+interrupted, foreign/missing/mismatched owners unknown. PID observations cannot
+guarantee hostile-process identity. Nothing takes or recovers a lock or kills a PID.
+Live elapsed uses UTC, discloses clock adjustments and clamps negative values;
+terminal sidecar elapsed is monotonic. Without it, elapsed sums available check
+durations and excludes gaps/task wall time. These observations certify no gate.
+
+Logs select one frozen simple check name and a positive saved attempt; default is
+the latest, never a previous successful attempt. Tail bounds are 1–65536 bytes,
+default 8192; retrieval seeks and reads only that bounded tail. Unsafe non-regular/
+symlink logs are rejected. `bytesRead` counts bytes, `tailTruncated` describes the
+reader, and `logTruncated` is the actual writer flag or null when not yet known.
+Content uses explicitly labeled UTF-8 replacement, including partial characters.
+Small output is flushed within roughly 100ms while a check runs; final logs still
+retain their 1 MiB writer cap, timeout and process-group cleanup.
+
+Readable failed/interrupted observations return 0. Invalid arguments or missing
+selected logs return 2; infrastructure errors 3. Blocked progress returns 2 with a
+valid report. Readers execute no checks, make no network/model calls and change no
+state, receipts, source or index. Summary and original gate decisions stay unchanged.

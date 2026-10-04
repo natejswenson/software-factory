@@ -64,6 +64,9 @@ Use `factory explain --run /path/to/run` to see which proof became stale and
 which files changed since the saved verification.
 `factory review-context --run /path/to/run --stage code --json` prepares complete
 inputs for your native reviewer after verification; the reviewer supplies judgment.
+Use `factory progress --run /path/to/run` during verification and
+`factory logs --run /path/to/run --check-name tests --tail-bytes 8192` for a
+bounded log tail. These observations do not replace verification or review.
 
 ## Read more
 

@@ -109,6 +109,13 @@ historical verdicts from freshness, lists fingerprint differences and edits sinc
 the saved proof, and reports the authoritative next action. Unknown inspection
 or live-owner wait is observational; never repair receipts or bypass gates.
 
+During checks, another process can use `progress --run <run> --json` and
+`logs --run <run> --check-name <frozen-name> --tail-bytes 8192 --json`. Optional
+`--attempt` selects an older saved attempt. Snapshots/logs are read-only observations,
+not proof. Unknown/interrupted owners require inspection; monitoring never recovers
+locks, kills processes or authorizes retries. Retry a changed snapshot; use actual
+final verification and existing next gates after completion.
+
 Check both `phase` and `next`: failed checks return exit 2 with valid JSON and
 failed evidence. Keep concise factual progress updates during long work.
 
