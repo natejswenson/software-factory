@@ -124,3 +124,16 @@ owned delivery recovery, unavailable objects/worktrees, malformed rules/receipts
 live operation locks and edits during inspection. State, receipt, index, HEAD
 and source bytes are compared. Summary tests retain exact historical projections;
 installed smoke checks current explanation and terminal historical delivery.
+
+## Reviewer bundles
+
+`tests/test_review_context.py` asserts exact stage/context/evidence/task/criteria/
+plan/rules/frozen checks, scoped instruction order and complete binary-capable
+Git patch bytes. It covers explicit attributed inputs, file/aggregate/diff/bundle
+bounds, unsafe/invalid UTF-8 files, live/foreign owners, changing inputs/new scopes,
+historical rules-disabled contexts and stale review rejection. Automatic scope tests
+reject outside directory symlinks and metadata/open races before external reads,
+while retaining explicit path semantics. Non-UTF-8 Git patch
+bytes round-trip through JSON; human output spells surrogate escapes explicitly.
+State, receipts, source/index/HEAD and legacy schemas stay intact. Installed smoke
+exercises both stages and compares their exact values with the real lifecycle.

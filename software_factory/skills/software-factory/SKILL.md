@@ -115,10 +115,10 @@ failed evidence. Keep concise factual progress updates during long work.
 | Next action | Work |
 |---|---|
 | `plan` | Investigate actual code and instructions. Write the returned plan path with scope, criteria, concrete changes and checks. Use `plan --run <run> --file <plan>`. Address rejected plan findings first. |
-| `plan-review` | Delegate one native read-only reviewer with task, repo instructions, worktree, plan and the exact context returned by next. Read current `rules --json`, pass their full content and priority to the reviewer along with the exact context. Reviewer writes a structured artifact. Submit it with `plan-review --run <run> --file <artifact>`. Fix rejected plans. |
+| `plan-review` | Delegate one native read-only reviewer with task, repo instructions, worktree, plan and the exact context returned by next. Use `review-context --run <run> --stage plan --json` for full exact inputs; supply current user/host directions and planned nested instructions explicitly. Read current `rules --json`, pass their full content and priority to the reviewer along with the exact context. Reviewer writes a structured artifact. Submit it with `plan-review --run <run> --file <artifact>`. Fix rejected plans. |
 | `implement` | Implement the approved plan in the task worktree, including meaningful tests for behavior. Fix recorded failed checks/findings. Then call `verify --run <run> --json`. |
 | `verify` | Execute `verify`; the CLI runs the frozen checks and captures results. Read failed logs, fix the cause and continue. Prepare legitimate dependencies beforehand; ignored dependencies are outside the Git freshness fingerprint. |
-| `review` | Delegate a native read-only reviewer with task, criteria, plan, instructions, full diff against frozen base, verification and exact returned evidence. Read current `rules --json` and pass their full content and priority to this reviewer too. Submit `review --run <run> --file <artifact>`. Fix valid findings, then reverify and obtain a fresh review. |
+| `review` | Delegate a native read-only reviewer with task, criteria, plan, instructions, full diff against frozen base, verification and exact returned evidence. Use `review-context --run <run> --stage code --json` after current passing verification. Repeat `--instructions-file`/`--supplement` for attributed private inputs; pass current user/host directions too. Read current `rules --json` and pass their full content and priority to this reviewer too. Submit `review --run <run> --file <artifact>`. Fix valid findings, then reverify and obtain a fresh review. |
 | `deliver` | Ensure the requested endpoint is authorized. `deliver --run <run> --json` commits the reviewed files and, by default, pushes and creates/reconciles a draft PR. Report observed URL and checks. Never silently downgrade to local. |
 | `resume` | Call `resume` to reconcile interrupted start. |
 | `wait` | An operation owns the run. Observe status and wait; never take it over. |
@@ -129,6 +129,12 @@ If native delegation is unavailable, conduct a distinct adversarial self-review,
 identify the reviewer as `self-review (native delegation unavailable)`, and
 disclose that limitation. The CLI validates schema/freshness, not independence
 or the truth of a review. Human judgment and actual test quality remain necessary.
+
+Bundles go to stdout only and create no verdict, review receipt or run mutation.
+Keep saved bundles private. They cannot discover conversation instructions or prove
+reviewer independence/supplement truth. Required unsafe, oversized or changing
+inputs are rejected; obtain coherent current inputs, never truncate them to bypass
+a gate. Normal review schemas and native reviewer judgment still apply.
 
 Never edit state.json, verification receipts or submitted reviews to clear a gate.
 Correct the work and generate fresh evidence through the CLI. Runtime state stays

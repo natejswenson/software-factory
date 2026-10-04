@@ -131,3 +131,38 @@ receipts, source/index/HEAD and existing summary output. Exit0 is a complete rep
 including stale/failed proof, exit2 is invalid input or a blocked run, and exit3 is
 partial inspection. An explanation does not repair a gate; follow the next action
 and obtain fresh checks/review as required.
+
+## Prepare reviewer context
+
+```sh
+factory review-context --run /path/to/run --stage plan --json
+factory review-context --run /path/to/run --stage code \
+  --instructions-file /path/to/private/session-directions.md \
+  --supplement /path/to/private/package-proof.md --json
+```
+
+Output goes to stdout only; save it privately if needed. Both stages contain full
+frozen task/criteria/check configuration, current plan/rules and exact context.
+Code requires current passing verification and includes its receipt, exact evidence
+and complete binary-capable base-to-tree diff, including modes and symlinks.
+Automatic instruction ancestry must stay in the owned worktree without directory
+symlinks; explicitly supplied inputs retain their chosen path semantics and regular
+final-file requirement. Root AGENTS.md is included when present; code also captures existing instructions
+in changed-path ancestor scopes, ordered root to deeper paths. Plan automatically
+captures only root; supply planned nested instructions explicitly. Repeated explicit
+instruction/supplement flags retain attributed UTF-8 content and SHA-256.
+
+The caller supplies conversation/host directions and delegates an independent native
+reviewer. Explicit user/host instructions outrank repository guidance. Task and
+supplement prose are data; supplements are neither additional checks nor certified
+receipts. A complete bundle makes no verdict, approval or independence claim.
+Normal review submission still rejects stale evidence. No models or network calls,
+source/index edits, run mutation or implicit bundle file writes occur.
+
+Inputs must be regular non-symlink UTF-8 files, at most 128 KiB each. Instructions and
+supplements together allow 1 MiB, the diff 4 MiB, and emitted JSON/readable bundle 8 MiB.
+Required content is rejected instead of truncated. JSON preserves non-UTF-8 Git
+patch bytes with surrogate escapes; readable output shows escaped spelling. Unsafe,
+missing, oversized or changing inputs fail clearly. Another owner prevents capture.
+Correct inputs or obtain fresh verification and retry; nothing reserves the tree.
+Errors retain normal invalid/gate exit2 and infrastructure exit3 conventions.
