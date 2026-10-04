@@ -36,6 +36,9 @@ class FactoryCase(unittest.TestCase):
         git(repo, ["config", "user.name", "Factory Test"])
         git(repo, ["config", "user.email", "factory@example.invalid"])
         git(repo, ["config", "commit.gpgsign", "false"])
+        # Keep disposable-repository byte snapshots independent of background GC.
+        git(repo, ["config", "maintenance.auto", "false"])
+        git(repo, ["config", "gc.auto", "0"])
         atomic_json(
             repo / ".factory.json",
             {
