@@ -61,6 +61,11 @@ def main() -> int:
         assert cli("prd-init", "--repo", retrofit)["created"] == []
         run(["git", "add", "."], repo)
         run(["git", "commit", "-m", "synthetic installation baseline"], repo)
+        readiness = cli(
+            "preflight", "--repo", repo, "--worktree-root", root / "preflight worktrees", "--endpoint", "local"
+        )
+        assert readiness["ready"] is True and readiness["deliveryReady"] is True
+        assert not (root / "preflight worktrees").exists()
         status = cli(
             "start",
             "--repo",

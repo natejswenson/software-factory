@@ -57,6 +57,10 @@ ask your coding agent: **“Use software-factory in this repo to fix [task]. Fin
 with verified changes and a draft PR.”** The skill drives the loop in your
 current session; the CLI prints the next action and does not call a model itself.
 
+Optional `factory preflight --repo /path/to/app --worktree-root /path/to/approved/worktrees`
+reports local readiness without starting a task. Actual start/check/review/delivery
+gates still apply; remote readiness remains unverified offline.
+
 ## Read more
 
 - [Project setup](docs/user-guide/project-setup.md): settings, repository rules and compatibility.

@@ -103,3 +103,13 @@ The lifecycle test freezes full PRD text and multiple explicit criteria, dedupli
 resumes after source edits and completes a synthetic-reviewed real local lifecycle.
 Installed smoke asserts enrollment, standalone existing-project setup and repeats
 outside the source tree without Node/npm, using packaged scaffold resources.
+
+## Read-only preflight
+
+`tests/test_preflight.py` compares exact source/index/saved receipt bytes and
+Git worktree inventory before/after observations, including absent allocation and
+worktree directories. Real Git fixtures cover independent blockers, required
+settings drift, conflicts/submodules, branch collisions, allocation parent files,
+selected-base executables, missing tools and credential-bearing synthetic origins.
+Injected observation errors distinguish unavailable infrastructure from known
+blockers. Installed smoke exercises local preflight without creating its root.
