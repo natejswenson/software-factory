@@ -15,6 +15,8 @@ implement, verify and deliver the change without inventing product requirements.
 | 7 | [Run history and discovery](0007-run-history.md) | Ready for factory planning | None; [matching PRD](../prd/0007-run-history.md) |
 | 8 | [Pull request descriptions](0008-pull-request-descriptions.md) | Ready for factory planning | None; [matching PRD](../prd/0008-pull-request-descriptions.md) |
 
+| 9 | [Plugin structure](0009-plugin-structure.md) | Ready for factory planning | None; [matching PRD](../prd/0009-plugin-structure.md) |
+
 “Ready” describes specification completeness. It does not mean implementation,
 plan approval, passing checks, review or delivery has happened. All changes are
 unimplemented when these designs are introduced. [The evidence review](improvement-evidence.md)

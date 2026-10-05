@@ -1,6 +1,6 @@
 # Product requirements
 
-These six PRDs were authored after reviewing the current Python implementation
+These PRDs were authored after reviewing the current Python implementation
 and four saved Software Factory runs. They describe proposed improvements;
 none is implemented or delivered by adding these documents.
 
@@ -12,6 +12,8 @@ none is implemented or delivered by adding these documents.
 | 2 | [0006 — Verification progress and logs](0006-verification-progress.md) | [Design](../design/0006-verification-progress.md) |
 | 2 | [0007 — Run history and discovery](0007-run-history.md) | [Design](../design/0007-run-history.md) |
 | 2 | [0008 — Pull request descriptions](0008-pull-request-descriptions.md) | [Design](../design/0008-pull-request-descriptions.md) |
+
+| 1 | [0009 — Plugin structure](0009-plugin-structure.md) | [Design](../design/0009-plugin-structure.md) |
 
 IDs align with the execution designs; 0001 and 0002 remain the earlier repository
 cleanup and PRD setup designs. [The evidence review](../design/improvement-evidence.md)
