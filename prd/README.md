@@ -8,12 +8,15 @@
 
 *Keep user requirements explicit and separate from implementation evidence.*
 
-These PRDs were authored after reviewing the current Python implementation
-and four saved Software Factory runs. They preserve requirements at authoring time;
-adding a specification alone does not establish implementation or delivery.
-Features 0003–0008 now have implementation and tests. Read the [current command
-reference](../docs/reference/commands.md) for their behavior. Plugin structure 0009
-is under review in [draft PR #18](https://github.com/natejswenson/software-factory/pull/18).
+Earlier pairs preserve requirements at their original authoring time. Features
+0001–0009 are present in inspected local `main` at `84f387e`; original document
+bodies retain their historical drafting context. That local baseline does not
+establish present remote PR or release state.
+
+The [2026-10-05 run review](../design/run-review-2026-10-05.md) examined 27 saved
+runs and 48 verification receipts. It adds **six proposed pairs, 0010–0015**, for
+efficiency, output quality and ease of use. Their implementation is pending.
+Read the [current command reference](../docs/reference/commands.md) for existing behavior.
 
 | Priority | PRD | Execution design |
 |---|---|---|
@@ -24,6 +27,17 @@ is under review in [draft PR #18](https://github.com/natejswenson/software-facto
 | 2 | [0007 — Run history and discovery](0007-run-history.md) | [Design](../design/0007-run-history.md) |
 | 2 | [0008 — Pull request descriptions](0008-pull-request-descriptions.md) | [Design](../design/0008-pull-request-descriptions.md) |
 | 1 | [0009 — Plugin structure](0009-plugin-structure.md) | [Design](../design/0009-plugin-structure.md) |
+
+## New findings
+
+| Priority | Area | PRD | Execution design |
+|---|---|---|---|
+| 1 | Efficiency / quality | [0010 — Integration readiness](0010-integration-readiness.md) | [Design](../design/0010-integration-readiness.md) |
+| 2 | Efficiency | [0011 — Focused feedback](0011-focused-feedback.md) | [Design](../design/0011-focused-feedback.md) |
+| 1 | Quality | [0012 — Boundary test contracts](0012-boundary-test-contracts.md) | [Design](../design/0012-boundary-test-contracts.md) |
+| 2 | Simplicity | [0013 — PRD intake](0013-prd-intake.md) | [Design](../design/0013-prd-intake.md) |
+| 1 | Simplicity / efficiency | [0014 — Guided resume](0014-guided-resume.md) | [Design](../design/0014-guided-resume.md) |
+| 1 | Quality / simplicity | [0015 — Documentation contracts](0015-documentation-contracts.md) | [Design](../design/0015-documentation-contracts.md) |
 
 IDs align with the execution designs; 0001 and 0002 remain the earlier repository
 cleanup and PRD setup designs. [The evidence review](../design/improvement-evidence.md)
