@@ -146,6 +146,16 @@ Use `summary --run <run>` for a concise human overview, or add `--json` for its
 compact exact-value projection. This read-only view shows latest checks/findings,
 the current next action and delivery; use `next --json` for artifact freshness.
 
+Optional handoff inspection: `integration --run <run> --target main --json`
+compares the recorded delivery commit (or undelivered worktree HEAD) with a named
+local branch/tracking ref. It separates historical delivery, local ancestry and
+current pending operations. Every Git read is offline with lazy fetching disabled;
+unsupported Git, missing objects/worktrees, owners and changed snapshots remain
+unknown. Exit0 means complete observation, exit2 invalid input/pending operations,
+exit3 required observations unavailable. No checks or gates change. Ancestry
+certifies neither conflict freedom nor fresh proof; undertake integration only as
+a separately authorized task with normal verification/review/delivery.
+
 ## Drive the loop
 
 After each step call `next --run <run> --json` and carry out its next action.

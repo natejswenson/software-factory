@@ -87,6 +87,42 @@ are not certified or reserved. Normal start/delivery revalidate all their gates.
 A passing report does not establish executable verification or task completion.
 
 
+## Inspect a delivery's local integration state
+
+```sh
+factory integration --run /path/to/run --target main --json
+```
+
+Compare a saved delivery commit with a named local branch or tracking ref. If the
+run has no delivery, compare its current worktree HEAD and label it undelivered.
+The recorded endpoint and PR remain historical; remote PR, CI, merge and release
+state are unknown. `main`, `origin/main`, `refs/heads/main` and
+`refs/remotes/origin/main` select local refs. HEAD, hashes and revision expressions
+are invalid. No fetch, merge, rebase, commit, checks or gate changes occur.
+
+JSON version1 separates `recordedDelivery`, `target` (requested ref, resolved ref
+and commit), `head` (commit and source), `ancestry` (targetIsAncestor, ahead,
+behind), `current` (worktreeAvailable, pendingOperations, owner, headMatchesReceipt,
+head), nextSteps, limitations and errors. Unknown observations are null; an empty
+pendingOperations list means no markers were observed. Current HEAD disagreement
+never substitutes a different commit for the saved delivery comparison.
+
+Pending merge, cherry-pick and rebase markers are inspected even when the index
+and source are unchanged. Missing worktrees, refs or objects, unsafe markers and
+changing snapshots remain explicit errors. Shallow history leaves complete ancestry
+counts unknown. Any observed owner prevents current
+Git inspection; the command neither probes a PID nor acquires or recovers locks.
+Missing worktrees can retain committed ancestry while current operations stay
+unknown. Unsupported Git fails closed: every Git read requires `--no-lazy-fetch`
+and disables optional locks, including reads of missing partial-clone objects.
+
+Exit0 means complete observation, including target divergence or a blocked task
+phase. Exit2 means invalid input or a known pending operation. Exit3 means required
+observations are unavailable; this takes precedence over pending operations.
+Ancestry does not establish conflict freedom, fresh checks, review or integration
+permission. Plan any integration as a separately authorized task and obtain its
+normal verification, review and delivery evidence.
+
 ## Explain task evidence
 
 ```sh

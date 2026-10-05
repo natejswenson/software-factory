@@ -105,3 +105,17 @@ Human lifecycle labels draft/ready/in-progress/delivered are not enforced states
 In-progress requires an actual run; delivered requires observed endpoint evidence.
 Only update labels when requested/included in reviewed work before final checks;
 record post-delivery links through a subsequent reviewed change. Do not auto-run PRDs.
+
+## Inspect the integration handoff
+
+After delivery, use `factory integration --run /path/to/run --target main` to
+inspect the saved commit against the current local target hash. Add `--json` for
+exact values. The report separates recorded delivery from ancestry, current HEAD
+and pending Git operations. It works offline and creates no task proof.
+
+A divergent target calls for a separately authorized integration task. Pending
+operations or unavailable inputs require inspection before proceeding. Keep the
+original receipt; obtain fresh checks and review after integration edits. The
+command never fetches or certifies remote PR, CI, merge or release state. See the
+[command reference](../reference/commands.md#inspect-a-deliverys-local-integration-state)
+for unknown values, Git requirements and exit codes.

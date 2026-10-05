@@ -24,15 +24,28 @@ implement, verify and deliver the change without inventing product requirements.
 | 8 | [Pull request descriptions](0008-pull-request-descriptions.md) | Ready for factory planning | None; [matching PRD](../prd/0008-pull-request-descriptions.md) |
 | 9 | [Plugin structure](0009-plugin-structure.md) | Ready for factory planning | None; [matching PRD](../prd/0009-plugin-structure.md) |
 
+## New run-review designs
+
+The [2026-10-05 evidence review](run-review-2026-10-05.md) covers 27 saved runs.
+Each proposal is independent against inspected main; the matching PRD owns its
+user requirements. Implementation of 0010–0015 is pending.
+
+| Priority | Design | Matching PRD |
+|---|---|---|
+| 1 | [0010 — Integration readiness](0010-integration-readiness.md) | [PRD](../prd/0010-integration-readiness.md) |
+| 2 | [0011 — Focused feedback](0011-focused-feedback.md) | [PRD](../prd/0011-focused-feedback.md) |
+| 1 | [0012 — Boundary test contracts](0012-boundary-test-contracts.md) | [PRD](../prd/0012-boundary-test-contracts.md) |
+| 2 | [0013 — PRD intake](0013-prd-intake.md) | [PRD](../prd/0013-prd-intake.md) |
+| 1 | [0014 — Guided resume](0014-guided-resume.md) | [PRD](../prd/0014-guided-resume.md) |
+| 1 | [0015 — Documentation contracts](0015-documentation-contracts.md) | [PRD](../prd/0015-documentation-contracts.md) |
+
 “Ready” describes specification completeness. It does not mean implementation,
 plan approval, passing checks, review or delivery has happened. Original design
 bodies describe behavior proposed at authoring time.
-Current implementation includes PRD scaffolding and features 0003–0008; use the
-[current guides](../docs/README.md) for supported behavior. Plugin structure 0009
-is under review in [draft PR #18](https://github.com/natejswenson/software-factory/pull/18). [The evidence review](improvement-evidence.md)
-documents the repository/run observations behind designs 0003–0008 and their
-recommended priority. Those pairs complement the active automation task rather
-than proposing a second CI/merge/release workflow.
+Inspected local `main` at `84f387e` contains implementation of 0001–0009; use the
+[current guides](../docs/README.md) for supported behavior. This is local source
+evidence, not a refreshed remote PR/release observation. The [original evidence
+review](improvement-evidence.md) retains the earlier four-run drafting context.
 
 ## Folder contract
 

@@ -538,5 +538,11 @@ class GuideTests(FactoryCase):
             self.assertEqual(output.returncode, 2)
             self.assertNotIn('Traceback', output.stderr)
         help_text = self.cli('--help').stdout
-        for name in ('guide', 'review-context', 'plan-review', 'pr-description'):
+        for name in ('guide', 'integration', 'review-context', 'plan-review', 'pr-description'):
             self.assertIn(name, help_text)
+        handoff = self.cli('integration', '--run', run['run'], '--target', 'main', '--json')
+        self.assertEqual(handoff.returncode, 0, handoff.stderr)
+        handoff_report = json.loads(handoff.stdout)
+        self.assertEqual(handoff_report['head']['source'], 'worktree')
+        self.assertEqual(handoff_report['current']['pendingOperations'], [])
+        self.assertEqual(before, self.snapshot(f.root))

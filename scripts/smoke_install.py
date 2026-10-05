@@ -168,6 +168,13 @@ def main(plugin: Path | None = None) -> int:
         assert guided["selected"]["recordedOutcome"] == done["delivery"]
         assert guided["selected"]["next"]["action"] == "done"
         assert guided["selected"]["recommended"] is None and guided["partial"] is False
+        handoff = cli("integration", "--run", directory, "--target", "main")
+        assert handoff["version"] == 1 and handoff["recordedDelivery"] == done["delivery"]
+        assert handoff["target"]["commit"] == run(["git", "rev-parse", "main"], repo).strip()
+        assert handoff["head"] == {"commit": done["delivery"]["commit"], "source": "recorded-delivery"}
+        assert handoff["ancestry"] == {"targetIsAncestor": True, "ahead": 1, "behind": 0}
+        assert handoff["current"]["pendingOperations"] == [] and handoff["current"]["headMatchesReceipt"]
+        assert handoff["errors"] == []
         assert before == {path: path.read_bytes() for path in directory.rglob("*") if path.is_file()}
         skill = Path(cli("skill-path"))
         assert skill == plugin / "skills/software-factory" if plugin else skill.is_relative_to(Path(sys.prefix))
