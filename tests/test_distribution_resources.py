@@ -15,13 +15,17 @@ class DistributionResourcesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             wheel = Path(temporary) / "factory.whl"
             source = Path(temporary) / "factory.tar.gz"
-            def build(changed=None):
+            documentation = tuple(str(p.relative_to(ROOT)) for p in (ROOT / "docs").rglob("*")
+                                  if p.is_file() and p.suffix in {".md", ".json"})
+            def build(changed=None, source_changed=None, source_missing=None):
                 with zipfile.ZipFile(wheel, "w") as archive:
                     for member, original in (SKILL | TEMPLATES).items():
                         archive.writestr(member, b"stale" if member == changed else (ROOT / original).read_bytes())
                 with tarfile.open(source, "w:gz") as archive:
-                    for original in (*SKILL.values(), *TEMPLATES, *SDIST_REQUIRED):
-                        data = (ROOT / original).read_bytes()
+                    for original in (*SKILL.values(), *TEMPLATES, *SDIST_REQUIRED, *documentation):
+                        if original == source_missing:
+                            continue
+                        data = b"stale" if original == source_changed else (ROOT / original).read_bytes()
                         info = tarfile.TarInfo(f"factory/{original}")
                         info.size = len(data)
                         archive.addfile(info, io.BytesIO(data))
@@ -30,6 +34,13 @@ class DistributionResourcesTests(unittest.TestCase):
             for changed in (next(iter(SKILL)), next(iter(TEMPLATES))):
                 build(changed)
                 with self.assertRaisesRegex(ValueError, "resource differs"):
+                    check([wheel, source])
+            for document in ("docs/user-guide/project-setup.md", "docs/branding.json"):
+                build(source_changed=document)
+                with self.assertRaisesRegex(ValueError, "Source archive resource differs"):
+                    check([wheel, source])
+                build(source_missing=document)
+                with self.assertRaises(KeyError):
                     check([wheel, source])
             build()
             with tarfile.open(source, "w:gz") as archive:

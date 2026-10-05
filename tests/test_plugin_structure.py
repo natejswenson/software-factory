@@ -200,7 +200,7 @@ class PluginStructureTests(unittest.TestCase):
         self.assertEqual(snapshot(self.plugin), before)
 
     def test_maintained_document_links_resolve(self):
-        paths = [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *ROOT.glob("docs/*.md"),
+        paths = [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *(p for p in ROOT.rglob("docs/**/*.md") if "history" not in p.parts),
                  *ROOT.glob("skills/software-factory/*.md")]
         for path in paths:
             for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", path.read_text()):
@@ -209,7 +209,7 @@ class PluginStructureTests(unittest.TestCase):
                 self.assertTrue((path.parent / target.split("#")[0]).exists(), f"{path.name}: {target}")
 
     def test_moved_usage_preserves_run_location_and_numeric_limits_as_prose(self):
-        usage = (ROOT / "docs/usage.md").read_text()
+        usage = '\n'.join((ROOT / p).read_text() for p in ('docs/user-guide/project-setup.md', 'docs/user-guide/tasks-and-recovery.md', 'docs/reference/commands.md'))
         common = Path("synthetic-common")
         recorded_location = runs_root(common).relative_to(common).as_posix()
         self.assertIn(f"Git common-dir (`{recorded_location}`)", usage)

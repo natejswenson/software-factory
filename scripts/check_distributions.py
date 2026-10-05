@@ -28,7 +28,8 @@ def check(archives: list[Path], root: Path = ROOT) -> None:
             with tarfile.open(path) as archive:
                 names = archive.getnames()
                 prefix = names[0].split("/")[0]
-                for source in (*SKILL.values(), *TEMPLATES, *SDIST_REQUIRED):
+                documentation = tuple(str(p.relative_to(root)) for p in (root / "docs").rglob("*") if p.is_file() and p.suffix in {".md", ".json"})
+                for source in (*SKILL.values(), *TEMPLATES, *SDIST_REQUIRED, *documentation):
                     stream = archive.extractfile(f"{prefix}/{source}")
                     if stream is None or stream.read() != (root / source).read_bytes():
                         raise ValueError(f"Source archive resource differs: {path.name}: {source}")

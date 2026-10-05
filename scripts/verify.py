@@ -42,7 +42,7 @@ def check_source() -> int:
         raise RuntimeError("No Python sources discovered.")
     for path in paths:
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    for script in ("check_layout.py", "plugin_metadata.py"):
+    for script in ("check_layout.py", "plugin_metadata.py", "documentation.py"):
         subprocess.run([sys.executable, str(ROOT / "scripts" / script), *(["--check"] if script == "plugin_metadata.py" else [])],
                        cwd=ROOT, check=True)
     print(f"{len(paths)} Python source files parse.")

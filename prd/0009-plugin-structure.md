@@ -1,6 +1,10 @@
 # 0009 — Simplify Software Factory into one installable plugin
 
-Status: ready for factory planning; proposed change, implementation pending.
+Status: implementation under review in draft PR #18; not merged or released.
+
+Documentation decision updated 2026-10-05: the user requested useful nested
+guides with claude-skills PRESS branding, superseding the earlier flat-guide
+proposal. The runtime/plugin ownership contract remains unchanged.
 
 ## Problem and users
 
@@ -43,9 +47,11 @@ command exists.
   directory. Keep the standalone installed `factory` command supported.
 - Generate wheel copies of the skill from its canonical source during the build;
   do not maintain a second authored copy inside the Python package.
-- Flatten maintained documentation to `docs/installation.md`, `usage.md`,
-  `evidence.md`, `development.md` and `automation.md`. Preserve the three
-  historical documents in `docs/history/`, and preserve `prd/` and `design/`.
+- Keep useful nested documentation under `docs/user-guide/`, `docs/reference/`
+  and `docs/development/`, with one task-oriented `docs/README.md` index. Match
+  claude-skills PRESS Markdown branding using generated pinned mastheads.
+  Preserve the three historical bodies in `docs/history/` and original numbered
+  specifications in `prd/` and `design/`.
 - Add checks for metadata drift, directory ownership, distribution resources
   and plugin execution/update compatibility. Document migration and recovery.
 
@@ -139,7 +145,7 @@ editing receipts or replacing an active task's frozen checks.
   wheel rebuilt from the extracted source archive contains byte-identical skill
   documents and working PRD templates, installed skill-path resolves, and the
   installed lifecycle smoke passes outside the checkout with Node/npm absent.
-- **AC6:** The five maintained docs preserve all current user/contributor
+- **AC6:** The nested maintained guides preserve all current user/contributor
   contracts and have resolving maintained links; historical documents and all
   existing numbered PRDs/designs are retained, with a clear migration guide for
   native plugins, standalone CLI users and legacy manual skill links.

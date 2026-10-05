@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OWNED = {"skills", "software_factory", "scripts", "tests", "docs", "prd", "design", "plugins",
          ".codex-plugin", ".claude-plugin", ".agents"}
 GENERATED = {"__pycache__", ".venv", "build", "dist", ".git", ".factory-worktrees"}
-RETIRED = {"docs/README.md", "docs/history/README.md", "docs/plans/README.md"}
+RETIRED = {"docs/history/README.md", "docs/plans/README.md"}
 
 
 def check(root: Path = ROOT) -> None:

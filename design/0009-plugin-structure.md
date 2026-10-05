@@ -1,6 +1,10 @@
 # 0009 — Repository-root plugin and simpler source ownership
 
-Status: ready for factory planning; proposed change, implementation pending.
+Status: implementation under review in draft PR #18; not merged or released.
+
+Documentation decision updated 2026-10-05: the user requested useful nested
+guides with claude-skills PRESS branding, superseding the earlier flat-guide
+proposal. The runtime/plugin ownership contract remains unchanged.
 
 Product contract: [PRD 0009](../prd/0009-plugin-structure.md).
 
@@ -70,11 +74,11 @@ software-factory/                    # repository AND plugin root
 │   ├── test_plugin_launcher.py
 │   └── test_layout.py
 ├── docs/
-│   ├── installation.md
-│   ├── usage.md
-│   ├── evidence.md
-│   ├── development.md
-│   ├── automation.md
+│   ├── README.md                    # reader/task guide map and historical context
+│   ├── user-guide/{installation,project-setup,tasks-and-recovery}.md
+│   ├── reference/{commands,evidence}.md
+│   ├── development/{architecture,testing,automation,documentation}.md
+│   ├── branding.json                # generated pinned PRESS region receipt
 │   └── history/[three preserved historical documents]
 ├── prd/{README.md,_template.md,numbered requirements}
 └── design/{README.md,numbered designs,improvement-evidence.md}
@@ -202,26 +206,29 @@ archive must all work. Continue installed smoke tests with Node/npm absent.
 
 ## Documentation moves and ownership
 
-| Existing latest-main file | Destination/action |
+| Content | Maintained owner |
 |---|---|
-| `docs/user-guide/installation.md` | `docs/installation.md`; lead with host plugin installation; retain uv/pip/source and migration instructions |
-| `docs/user-guide/project-setup.md` | Merge into `docs/usage.md`; retain every settings, rules, scaffold and frozen-check constraint |
-| `docs/user-guide/tasks-and-recovery.md` | Merge into `docs/usage.md`; retain all current commands and recovery semantics |
-| `docs/reference/evidence.md` | `docs/evidence.md`; preserve proof/freshness/observation limits |
-| `docs/development/architecture.md` | `docs/development.md`; explain the ownership tree, adapters and flat engine |
-| `docs/development/testing.md` | Merge into `docs/development.md`; retain behavior mappings and runnable verification/build instructions |
-| `docs/development/automation.md` | `docs/automation.md`; retain CI, reviewed changes, protected main and automatic release contracts |
-| `docs/history/*.md` | Retain the three historical bodies; add clearly labeled history links in development.md |
-| `docs/history/README.md`, `docs/README.md`, `docs/plans/README.md` | Remove redundant indexes after transferring unique context and updating incoming maintained links |
-| `README.md`, `CONTRIBUTING.md` | Short entrypoints linking directly to the five docs, shared skill, requirements and designs |
-| `prd/`, `design/` | Keep stable filenames/content and their useful task indexes; preserve all intervening documents |
+| Installation, updates, standalone tools and migration | `docs/user-guide/installation.md` |
+| Settings, rules and additive PRD setup | `docs/user-guide/project-setup.md` |
+| Task flow, PRD intake, recovery and stacks | `docs/user-guide/tasks-and-recovery.md` |
+| Detailed diagnostics, observations, bundles and PR presentation | `docs/reference/commands.md` |
+| Freshness, delivery and proof limits | `docs/reference/evidence.md` |
+| Engine/plugin/build ownership | `docs/development/architecture.md` |
+| Behavioral coverage, package and native-host verification | `docs/development/testing.md` |
+| CI, ready-PR merges and main releases | `docs/development/automation.md` |
+| Navigation, generated mastheads and pinned-brand integrity | `docs/development/documentation.md` and generated `docs/branding.json` |
+| Reader/task routing and preserved historical context | One useful `docs/README.md`; root README remains the product entrypoint |
+| Historical bodies and original numbered specifications | Preserve byte-identical bodies; update useful PRD/design indexes and this active pair |
 
-Prepare an inventory of substantive content before merging files. Repository
-navigation belongs in root README, operation detail in usage, proof limits in
-evidence, contributor/build detail in development, automation in automation.
-SKILL.md and protocol.md own agent execution and review artifact schemas; docs
-link to them instead of copying the complete schema. PRDs answer what/why and
-designs answer how; do not combine or erase those roles.
+Inventory substantive sections before splitting long pages. Every nested folder
+has real content and a clear reader purpose; no per-folder README scaffolds.
+Generate PRESS mastheads from its pinned emitter, never hand-copy brand identity.
+Python source verification checks local links/fragments, required navigation and
+region integrity against a generated provenance receipt without a Node runtime
+dependency. Optional authoring uses the installed matching PRESS tooling. This
+checks the adopted pin; automatic cross-repository freshness propagation is not
+configured by this change. SKILL.md/protocol.md own agent execution and artifact
+schemas; link rather than duplicate them. PRDs answer what/why and designs how.
 
 Remove only source directories left empty by reviewed moves. Do not recursively
 remove arbitrary empty local directories or rewrite historical narratives to
@@ -315,7 +322,7 @@ Python unittest change policy, including commits with metadata/docs changes.
 3. Move the skill to its canonical regular source directory; implement the thin
    launcher, source/installed skill-path selection and tested build adapter.
    Preserve engine interfaces and original packaged PRD resource behavior.
-4. Flatten docs according to the content inventory, repair links, document
+4. Organize nested guides according to the content inventory, repair links, document
    migration and add the small ownership check. Preserve historical/spec bodies.
 5. Build wheel/source archives and rebuild an extracted source archive; execute
    both lifecycle smoke routes and observe native host updates across revisions.
@@ -352,7 +359,7 @@ merges/releases as part of writing or delivering this pair.
   wheel rebuilt from the extracted source archive contains byte-identical skill
   documents and working PRD templates, installed skill-path resolves, and the
   installed lifecycle smoke passes outside the checkout with Node/npm absent.
-- **AC6:** The five maintained docs preserve all current user/contributor
+- **AC6:** The nested maintained guides preserve all current user/contributor
   contracts and have resolving maintained links; historical documents and all
   existing numbered PRDs/designs are retained, with a clear migration guide for
   native plugins, standalone CLI users and legacy manual skill links.
@@ -375,5 +382,6 @@ metadata/version semantics after a host test failure requires a reviewed plan
 change and fresh proof.
 
 The implementation endpoint is a draft PR on main, with observed head/base and
-the concrete verification evidence above. No delivery link exists yet. This
-document is ready for planning, not implementation approval or shipped behavior.
+the concrete verification evidence above. The implementation is under review in
+[draft PR #18](https://github.com/natejswenson/software-factory/pull/18). This link
+establishes draft delivery, not merge, release or approval of later changes.
