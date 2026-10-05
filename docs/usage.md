@@ -1,4 +1,99 @@
-# Tasks and recovery
+# Usage
+
+Examples use `factory` as shorthand for the verified loaded-engine command in the
+[skill](../skills/software-factory/SKILL.md#select-the-loaded-engine).
+
+## Project setup
+Select checks that actually establish the project's behavior:
+
+```sh
+factory init --repo /path/to/app --check '["python3","-m","unittest","discover","-s","tests"]'
+```
+
+`init` creates `.rules/factory.md` plus `prd/README.md` and `prd/_template.md`.
+Review and commit the intended settings/scaffold on your selected base.
+Settings and repository instructions live together in Markdown. For example,
+create `.rules/factory.md` with:
+
+````markdown
+# Software Factory
+
+```factory-config
+{
+  "version": 1,
+  "endpoint": "draft-pr",
+  "checks": [
+    { "name": "tests", "argv": ["python3", "-m", "unittest", "discover", "-s", "tests"], "timeoutMs": 120000 }
+  ]
+}
+```
+
+## Repository instructions
+
+Use the existing module patterns. Add a regression test for each bug fix.
+Explain any change to public APIs in the README.
+````
+
+Add other instructions in files such as `.rules/testing.md` and
+`.rules/review.md`. Direct lowercase `*.md` files are read in lexical filename
+order; nested directories and other extensions are skipped. Missing `.rules`
+means no extra instructions. Files must be regular UTF-8 files, at most 128 KiB
+each, 128 files and 1 MiB total. Symlinks are rejected. Instructions are read by
+the agent and both reviewers; the CLI does not execute Markdown or interpret
+natural language as check commands. Explicit user and host/repository
+instructions take priority. Rules do not authorize merges or bypass review.
+
+A `factory-config` fence (backticks or tildes) contains a JSON object with only
+`version`, `endpoint` and `checks`. Settings can be split among files, but each
+key may appear only once across all config blocks. Duplicate JSON keys,
+unknown settings and malformed/unterminated config blocks are errors. Examples
+inside another code fence are not settings. Default version is 1 and endpoint
+is `draft-pr`; at least one meaningful check is required. Checks use literal
+argv arrays and `timeoutMs` (100–600000). No shell is added.
+
+Existing `.factory.json` projects remain supported. When both formats exist,
+the valid legacy file provides the baseline and Markdown settings explicitly
+override its keys. To migrate, move the JSON into a `factory-config` fence and
+remove `.factory.json`; commit both changes before starting the next task.
+`init` refuses existing settings rather than overwriting them.
+
+Configuration and selected rules must match the committed selected base at
+start. The task then reads rules from its own worktree; edits in the original
+checkout cannot replace those instructions. `factory rules --run <run>` prints
+current rules; `--json` returns exact file paths, content, hashes and the initial
+snapshot path. Initial content is preserved privately as `rules-initial.json`
+and in saved state; `status` labels its initial hash and paths. Resume retains
+that snapshot and checks current worktree instructions.
+
+Adding, editing or removing a rule requires fresh plan review, checks and code
+review before delivery, even if the rule file is ignored by Git. Settings are
+frozen at task start: editing Markdown settings requires fresh plan review,
+verification with the original checks and code review. The active task keeps its
+original endpoint as well. Reviewed settings changes can be delivered normally;
+subsequent tasks use the new configuration. Changes to legacy
+`.factory.json` retain the existing frozen-check behavior and appear in the
+reviewed diff. Runs created before rules support retain their original evidence
+protocol; rules apply automatically to new runs without rewriting old receipts.
+
+## PRD setup for existing projects
+
+```sh
+factory prd-init --repo /path/to/app --json
+```
+
+This independent command requires Git, resolves its root even from a subdirectory
+or linked worktree, and changes only missing scaffold files. It creates no settings,
+run, branch, commit or PR. Existing regular files are preserved byte-for-byte;
+there is no force or upgrade option. Symlinks and wrong types are rejected before
+writes. A write failure can leave partial files; errors report potentially incomplete
+created paths without rollback. Inspect/repair content manually; rerun fills only
+missing files. `init` still refuses existing settings: use `prd-init` to retrofit.
+
+JSON returns repo/prd paths, sorted disjoint created/skipped relative paths and next.
+`init --json` retains config/next and adds a nested prd result with the same shape.
+The scaffold is bundled in wheel/source packages, independent of working directory.
+
+## Tasks and recovery
 
 Your agent normally handles these commands:
 
@@ -34,8 +129,8 @@ check process alive: inspect and stop that task's orphan before recovery.
 `extend --attempts 1 --reason "User authorized another attempt"` extends a
 blocked run only under explicit user direction.
 
-Read the [skill](../../software_factory/skills/software-factory/SKILL.md) and
-[artifact protocol](../../software_factory/skills/software-factory/protocol.md) for plan/review commands.
+Read the [skill](../skills/software-factory/SKILL.md) and
+[artifact protocol](../skills/software-factory/protocol.md) for plan/review commands.
 Use `--json` for every command when integrating another agent or UI.
 
 `summary` is a read-only overview: task, criteria, last check results, findings

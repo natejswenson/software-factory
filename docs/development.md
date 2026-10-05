@@ -1,4 +1,75 @@
-# Behavioral coverage
+# Development
+
+## Architecture
+
+Software Factory is a small dependency-free Python CLI. The coding agent owns
+investigation, plans, implementation and review; the CLI stores task state and
+checks freshness and observed delivery. It does not launch a model or daemon.
+
+## Runtime ownership
+
+| Module | Responsibility |
+|---|---|
+| `__main__.py` | Source invocation entry point for `python3 -m software_factory` |
+| `__init__.py` | Runtime package version, supplied by build-time setuptools-scm when packaged |
+| `cli.py` | Argument parsing, dispatch, human/JSON output and exit codes |
+| `engine.py` | Enrollment, task allocation, phases, freshness gates, verification, recovery and branch rename |
+| `rules.py` | Bounded Markdown rules/config discovery, parsing and committed-base validation |
+| `checks.py` | Frozen argv validation, bounded check logs, timeout/signal handling and process cleanup |
+| `git.py` | Literal Git commands, supported repository state, temporary-index snapshots and worktree ownership |
+| `store.py` | Canonical version-1 hashing, private atomic JSON, run identity/history and operation locks |
+| `delivery.py` | Exact reviewed commit, remote head observation and idempotent draft PR reconciliation |
+| `pr_description.py` | Bounded evidence-bound agent prose, private previews and immutable PR presentation |
+| `preflight.py` | Read-only local readiness probes; advisory preparation, without task allocation or remote checks |
+| `diagnostics.py` | Read-only evidence comparisons and edits since saved proof, retaining engine gate decisions |
+| `review_context.py` | Bounded exact stage-specific review inputs and complete diff, without verdicts or persistence |
+| `ownership.py` | Shared read-only operation owner inspection without lock acquisition |
+| `progress.py` | Private verification observations and bounded read-only check log tails |
+| `history.py` | Tolerant bounded saved-run discovery, event pages and recorded attempt metrics |
+| `summary.py` | Read-only human/JSON projection of recorded checks, findings, next action and delivery |
+| `validation.py` | Shared JSON integer compatibility checks |
+| `errors.py` | Structured factory errors and error codes |
+| `resources.py` | Trusted source/wheel skill lookup and required plugin resources |
+
+## Task flow
+
+CLI input reaches the engine, which validates the committed base and repository
+rules, freezes the task/criteria/checks, then allocates an owned branch/worktree.
+A reviewed plan permits implementation. Verification executes all frozen checks
+and records exact context/tree evidence. Code review covers each criterion at
+that evidence. Delivery commits only the reviewed tree, observes the pushed head,
+and creates or reconciles an open draft PR at the selected head/base.
+
+The [evidence guide](evidence.md) explains freshness and limits;
+[task operations](usage.md) describe repair and recovery.
+The [bundled protocol](../skills/software-factory/protocol.md)
+defines plan/review artifacts. Documentation links to that protocol rather than
+maintaining another schema.
+
+## Source, instructions and private data
+
+- `software_factory/`, `tests/` and `scripts/` retain the flat source layout.
+- `.rules/*.md` provides repository instructions and validated executable settings.
+- `design/` describes implementation; `prd/` describes requirements. Both are task
+  inputs, not authority to bypass review or proof of completion.
+- Factory runs, receipts, logs and locks live under the Git common-dir's
+  `factory/runs`, outside committed source. Ignored dependencies and host services
+  are outside the Git fingerprint.
+- `skills/software-factory/` is the sole authored skill/protocol directory.
+  `scripts/factory.py` binds native-plugin execution to this root.
+- `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` are authored;
+  `scripts/plugin_metadata.py` generates the two Claude adapter files.
+- `scripts/build_resources.py` extends standard setuptools build_py: generated
+  wheel resources preserve the old installed path without source copies.
+  `factory skill-path` selects the source or installed path from the executing package.
+- `scripts/check_layout.py` and metadata `--check` are read-only source checks.
+  Ignored caches, build output and private runs are not authored source.
+
+Repository automation lives in `.github/workflows/` and the Python `scripts/`
+helpers; it is separate from the CLI's default draft endpoint. See
+[automation](automation.md) for the required CI and authorized ready-PR/release flow.
+
+## Behavioral coverage
 
 Run `python3 scripts/verify.py tests` for real temporary Git/worktree and process
 integration tests. Reviews in fixtures are explicitly synthetic.
@@ -183,3 +254,59 @@ and separate cleanup diagnostics survive; cleanup-only errors still fail. Existi
 process-group and restored-handler assertions remain. Disposable test repositories
 disable automatic Git maintenance/GC before their first commit, preventing background
 maintenance locks from racing strict file snapshots; preflight byte assertions remain.
+
+## Historical designs and observations
+
+These documents preserve their original bodies, dates and claims. Their Node
+installation/development commands are superseded by the maintained Python
+[installation guide](installation.md) and [testing guide](development.md).
+They are historical evidence, not current setup instructions or refreshed remote state.
+
+| Document | Original role |
+|---|---|
+| [Initial factory design](history/2026-10-02-software-factory.md) | Original Node design; current implementation is Python |
+| [Initial verification](history/2026-10-02-software-factory-verification.md) | Observations from the initial implementation |
+| [Summary verification](history/2026-10-02-summary-verification.md) | Observed failure/repair/resume proof explicitly awaiting final verification, review and delivery |
+
+The summary note's pending final evidence remains pending within that historical
+narrative; moving it does not establish an observed final outcome. Actual task
+receipts remain private under the Git common-dir. [New execution designs](../design/README.md)
+live at the top-level `design/` directory.
+
+## Plugin and archive verification
+
+Run `python3 scripts/plugin_metadata.py` after editing the authored Codex metadata;
+commit the deterministic Claude adapters. `--check` reports drift without writes.
+Unsupported primary capabilities require a designed compatibility adapter, not
+silent field removal. `python3 scripts/check_layout.py` checks owned source only,
+including reviewed untracked files, without following directory links or deleting
+folders. The required source check runs both validations.
+
+```sh
+python3 scripts/verify.py source
+python3 scripts/verify.py tests
+uv build
+python3 scripts/check_distributions.py dist/*.whl dist/*.tar.gz
+python3 scripts/smoke_install.py --plugin-root /path/to/copied/plugin
+```
+
+The standard setuptools adapter declares canonical resource inputs and wheel
+outputs. It copies skill bytes into build output only, refreshing changed inputs.
+The source archive includes root skills, manifests and the adapter; extracting it
+and building a fresh wheel must reproduce those bytes. `python -m build` builds
+its default wheel from the source archive. The release uses that frontend and
+its existing asset names/tag-derived version selection.
+
+The plugin smoke exercises the same synthetic local ledger lifecycle as the
+installed-wheel smoke, from an unrelated directory with a conflicting global
+factory sentinel and no Node/npm on PATH. Launcher tests also compare complete
+copied resource trees before/after read-only execution and check clear failures
+for missing/unsafe resources. Fixture reviews are synthetic, never human approval.
+
+Native host proof requires installing revision A then revision B through each
+host, inspecting the loaded cached skill bytes and running that copy's engine.
+Schema validation and discovery alone do not establish update/activation. Use
+supported isolated configuration and temporary Git marketplaces; no model turns,
+paid APIs or personal-record edits are required. Current local host observations
+belong in private review supplements, not source. CI retains Python 3.11/3.14 on
+Linux and Python 3.14 on macOS; report actual local platform coverage accurately.

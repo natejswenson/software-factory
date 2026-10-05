@@ -21,9 +21,8 @@ Every nonempty commit needs an added or semantically updated asserting test that
 passes. Documentation and configuration commits follow the same policy. Inspect
 test relevance in review; structural association is not proof of coverage.
 
-[Testing](docs/development/testing.md) explains behavior coverage and the installed
-wheel smoke. [Architecture](docs/development/architecture.md) maps implementation
-ownership. [Automation](docs/development/automation.md) explains ready PR merges,
+[Development](docs/development.md) maps implementation ownership, behavior coverage
+and the installed wheel smoke. [Automation](docs/automation.md) explains ready PR merges,
 required CI, patch releases, queue limits and retry behavior.
 
 ## Designs and evidence
@@ -33,6 +32,6 @@ Execution-ready specifications live in [design/](design/README.md). The hand-aut
 or establish completion. A design still needs its own reviewed factory plan.
 
 Factory verification, review and delivery receipts remain private under the Git
-common-dir. [Historical observations](docs/history/README.md) retain their original
+common-dir. [Historical observations](docs/development.md) retain their original
 claims. Do not publish raw run records or turn a pending observation into a
 completed claim. Keep draft implementation PRs draft at the task endpoint.

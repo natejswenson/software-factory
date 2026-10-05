@@ -1,0 +1,10 @@
+{
+  "name": "software-factory",
+  "description": "Take software tasks through reviewed planning, executable verification and an observed draft PR in Codex.",
+  "author": {
+    "name": "Nate Swenson"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/natejswenson/software-factory",
+  "repository": "https://github.com/natejswenson/software-factory"
+}

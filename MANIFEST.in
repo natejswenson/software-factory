@@ -8,3 +8,8 @@ include CONTRIBUTING.md
 recursive-include design *.md
 recursive-include prd *.md
 recursive-include software_factory/templates *.md
+recursive-include skills *.md
+include .codex-plugin/plugin.json
+include .agents/plugins/marketplace.json
+include .claude-plugin/plugin.json
+include .claude-plugin/marketplace.json

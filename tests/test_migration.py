@@ -160,7 +160,6 @@ class MigrationTests(FactoryCase):
         self.assertTrue((skill / "SKILL.md").is_file())
         self.assertTrue((skill / "protocol.md").is_file())
         self.assertEqual((ROOT / "skills/software-factory").resolve(), skill)
-        compatibility = ROOT / "skills/software-factory"
-        self.assertTrue(compatibility.is_symlink())
-        self.assertFalse(Path(os.readlink(compatibility)).is_absolute())
+        self.assertFalse((ROOT / "skills/software-factory").is_symlink())
+        self.assertFalse((ROOT / "software_factory/skills").exists())
         self.assertIn("Software Factory", self.cli("--help").stdout)

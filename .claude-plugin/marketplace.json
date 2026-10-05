@@ -1,0 +1,16 @@
+{
+  "name": "software-factory",
+  "owner": {
+    "name": "Nate Swenson"
+  },
+  "metadata": {
+    "description": "Take software tasks through reviewed planning, executable verification and an observed draft PR in Codex."
+  },
+  "plugins": [
+    {
+      "name": "software-factory",
+      "source": "./",
+      "description": "Take software tasks through reviewed planning, executable verification and an observed draft PR in Codex."
+    }
+  ]
+}
