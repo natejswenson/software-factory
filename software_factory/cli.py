@@ -3,16 +3,22 @@
 import argparse
 import json
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
-from . import diagnostics, engine, history, pr_description, preflight, progress, review_context
+from . import diagnostics, engine, history, integration, pr_description, preflight, progress, review_context
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
 from .resources import skill_path
 from .store import list_runs, read_run
 from .summary import format_summary, summarize
+
+
+class HelpFormatter(argparse.HelpFormatter):
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        return textwrap.wrap(" ".join(text.split()), width, break_on_hyphens=False, break_long_words=False)
 
 
 class Parser(argparse.ArgumentParser):
@@ -22,6 +28,7 @@ class Parser(argparse.ArgumentParser):
 
 def parser() -> Parser:
     result = Parser(
+        formatter_class=HelpFormatter,
         description="Software Factory — take one task to verified delivery in your current agent session.",
         epilog="Repeat --criterion and --check. Use --task-file for longer requests. No model calls or daemon.",
     )
@@ -29,7 +36,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, preflight, start, list, runs, history, status, next, summary, explain, review-context, pr-description, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, integration, start, list, runs, history, status, next, summary, explain, review-context, pr-description, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -46,6 +53,7 @@ def parser() -> Parser:
         "stage",
         "check-name",
         "phase",
+        "target",
     ):
         result.add_argument(f"--{option}")
     result.add_argument("--attempts", type=int)
@@ -83,6 +91,8 @@ def dispatch(args: argparse.Namespace) -> Any:
         return preflight.inspect(
             required("repo"), required("worktree-root"), base=args.base, branch=args.branch, endpoint=args.endpoint
         )
+    if action == "integration":
+        return integration.inspect(str(Path(required("run")).absolute()), required("target"))
     if action == "start":
         if sum(value is not None for value in (args.task, args.task_file, args.issue)) != 1:
             raise FactoryError("Choose exactly one of --task, --task-file or --issue.")
@@ -161,6 +171,8 @@ def format_output(action: str, result: Any) -> str:
         return pr_description.format_preview(result)
     if action == "skill-path":
         return result
+    if action == "integration":
+        return integration.format_report(result)
     if action == "preflight":
         return preflight.format_report(result)
     if action == "prd-init":
@@ -238,6 +250,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.json
             else format_output(args.command, result)
         )
+        if args.command == "integration":
+            return integration.exit_code(result)
         if args.command in ("runs", "history"):
             return 2 if result["errors"] else 0
         if args.command == "progress":
