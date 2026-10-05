@@ -1,19 +1,54 @@
 """Documentation regressions use real maintained guides and damaged fixture copies."""
 
 import json
+import re
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import documentation
+from scripts import ci_policy, documentation
 from software_factory import rules, history
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class DocumentationTests(unittest.TestCase):
+    def check_boundary_contract_ids(self, text):
+        def cases(suite):
+            for case in suite:
+                if isinstance(case, unittest.TestSuite):
+                    yield from cases(case)
+                else:
+                    yield case.id()
+
+        discovered = set(cases(unittest.TestLoader().discover(str(ROOT / 'tests'), top_level_dir=str(ROOT))))
+        identifiers = set(re.findall(r'`(tests\.[A-Za-z_][\w.]+)`', text))
+        self.assertTrue(identifiers, 'Boundary contract has no test references')
+        for identifier in sorted(identifiers):
+            self.assertIn(identifier, discovered, f'Undiscovered contract test: {identifier}')
+            module, cls, method = identifier.rsplit('.', 2)
+            source = ROOT / (module.replace('.', '/') + '.py')
+            self.assertIn(f'{cls}.{method}', ci_policy.test_bodies(source.read_text()),
+                          f'Contract reference lacks assertion-bearing body: {identifier}')
+
+    def test_boundary_contract_ids_are_discovered_asserting_and_navigation_is_present(self):
+        contract = (ROOT / 'docs/development/boundary-tests.md').read_text()
+        self.check_boundary_contract_ids(contract)
+        first = re.search(r'`(tests\.[A-Za-z_][\w.]+)`', contract)[1]
+        with self.assertRaisesRegex(AssertionError, 'Undiscovered contract test'):
+            self.check_boundary_contract_ids(contract.replace(first, 'tests.test_documentation.DocumentationTests.test_missing_contract_case'))
+        documentation.check_links(ROOT, ('docs/development/boundary-tests.md',))
+        for name, link in [('docs/README.md', '](development/boundary-tests.md)'),
+                           ('docs/development/testing.md', '](boundary-tests.md)')]:
+            self.assertIn(link, (ROOT / name).read_text())
+        for name in ('skills/software-factory/SKILL.md', 'skills/software-factory/protocol.md'):
+            text = (ROOT / name).read_text()
+            self.assertIn('docs/development/boundary-tests.md)', text)
+            self.assertIn('asserting', text)
+            self.assertIn('Synthetic' if name.endswith('protocol.md') else 'synthetic', text)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

@@ -62,6 +62,19 @@ criteria parser, approval, commit or backlog execution is implied.
 
 ## Reviewer context preparation
 
+Plans and reviewer inputs require a criterion-to-test or observed-evidence map:
+state the public claim, exact relevant asserting unittest ID or actual source
+observation, evidence kind and limits/omission reason. Use the repository's
+[boundary test contract](https://github.com/natejswenson/software-factory/blob/main/docs/development/boundary-tests.md) for applicable
+risks. Synthetic faults and fixture reviews are test evidence; real Git/process
+observations still do not establish live task delivery. After a repaired finding,
+include its regression and fresh full verification. Native reviewers read test
+bodies for relevance, including associated tests for each nonempty commit.
+Reference discovery/checklist completion, counts and nonempty evidence strings
+cannot bypass checks, exact freshness, repair limits, independence or observed
+delivery. This map is plan text or an attributed supplement, not a new JSON field
+or review stage; the schemas above and current-context requirements remain exact.
+
 Use `review-context --run <run> --stage plan|code --json` to assemble complete exact
 inputs; it does not submit or approve them. Code requires current passing checks.
 Repeat `--instructions-file` and `--supplement` for explicit private UTF-8 data.

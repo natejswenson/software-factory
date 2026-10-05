@@ -10,6 +10,10 @@
 
 ## Behavioral coverage
 
+Use the [boundary test contract](boundary-tests.md) to select applicable public
+risks and map each claim to asserting tests or actual observed evidence. Explain
+omissions and limits; the map and test counts do not establish correctness.
+
 Run `python3 scripts/verify.py tests` for real temporary Git/worktree and process
 integration tests. Reviews in fixtures are explicitly synthetic.
 

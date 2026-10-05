@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from software_factory import engine, history
+from software_factory.delivery import deliver
 from software_factory.errors import FactoryError
 from software_factory.git import git
 from software_factory.store import atomic_json, locked, read_run
@@ -15,6 +16,55 @@ from tests.support import FactoryCase
 
 
 class HistoryTests(FactoryCase):
+    def test_cli_malformed_neighbor_receipt_and_options_preserve_saved_outcomes(self):
+        f = self.fixture()
+        healthy = deliver(self.reviewed(f)["run"])
+        affected = self.checked(replace(f, options=replace(f.options, task="Synthetic malformed neighbor")))
+        expected_events = history.inspect(affected["run"])["events"]
+        self.assertTrue(expected_events)
+        state_path = Path(affected["run"]) / "state.json"
+        state = state_path.read_bytes()
+        receipt_path = Path(affected["run"]) / "verification-1.json"
+        receipt_path.write_bytes(b'{"synthetic malformed receipt":')
+        state_path.write_bytes(b'{"synthetic malformed metadata":')
+
+        def snapshot():
+            return {str(p.relative_to(f.root)): os.readlink(p) if p.is_symlink() else p.read_bytes()
+                    for p in f.root.rglob("*") if p.is_file() or p.is_symlink()}
+
+        before = snapshot()
+        output = self.cli("runs", "--repo", f.repo, "--json")
+        self.assertEqual(output.returncode, 2, output.stderr)
+        self.assertEqual(output.stderr, "")
+        report = json.loads(output.stdout)
+        self.assertEqual([row["id"] for row in report["runs"]], [healthy["id"]])
+        self.assertEqual(report["runs"][0]["delivery"], healthy["delivery"])
+        self.assertTrue(any(error["run"] == affected["run"] for error in report["errors"]))
+        self.assertEqual(snapshot(), before)
+
+        state_path.write_bytes(state)
+        before = snapshot()
+        output = self.cli("history", "--run", affected["run"], "--json")
+        self.assertEqual(output.returncode, 2, output.stderr)
+        self.assertEqual(output.stderr, "")
+        report = json.loads(output.stdout)
+        self.assertEqual(report["attempts"][0]["status"], "invalid")
+        self.assertIsNone(report["attempts"][0]["passed"])
+        self.assertEqual(report["totals"]["knownAttempts"], 0)
+        self.assertEqual(report["events"], expected_events)
+        self.assertTrue(report["errors"])
+        saved = self.cli("history", "--run", healthy["run"], "--json")
+        self.assertEqual(saved.returncode, 0, saved.stderr)
+        self.assertEqual(json.loads(saved.stdout)["delivery"], healthy["delivery"])
+        for command in (("runs", "--repo", f.repo, "--limit", "not-an-integer"),
+                        ("history", "--run", affected["run"], "--limit", "0")):
+            output = self.cli(*command, "--json")
+            self.assertEqual(output.returncode, 2)
+            self.assertEqual(output.stdout, "")
+            self.assertEqual(json.loads(output.stderr)["code"], "invalid")
+            self.assertNotIn("Traceback", output.stderr)
+        self.assertEqual(snapshot(), before)
+
     def change(self, run, **fields):
         state = read_run(run["run"])
         state.update(fields)

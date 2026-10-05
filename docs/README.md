@@ -30,6 +30,7 @@
 |---|---|
 | Understand modules, plugin ownership and build resources | [Architecture](development/architecture.md) |
 | Run checks, build archives and test installed/copied plugins | [Testing](development/testing.md) |
+| Map public promises to relevant asserting tests and observation limits | [Boundary test contracts](development/boundary-tests.md) |
 | Understand CI, ready-PR merges and automatic patch releases | [Automation](development/automation.md) |
 | Maintain prose, navigation and generated branding | [Documentation maintenance](development/documentation.md) |
 
