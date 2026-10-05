@@ -68,6 +68,38 @@ def _gate(
     return result
 
 
+def proof_gates(run: Run, ctx: dict[str, Any] | None, current: dict[str, Any] | None) -> dict[str, Any]:
+    """Pure projection shared by observers; performs no current inspection."""
+    gates = {}
+    plan_record = run.get("planReview")
+    plan_keys = (
+        tuple(ctx)
+        if ctx is not None
+        else ("base", "criteria", "config", "plan", *(("rules",) if run.get("rules") else ()))
+    )
+    # plan_current compares the whole context. Include extra saved keys in differences as well.
+    if isinstance(plan_record, dict) and isinstance(plan_record.get("context"), dict):
+        plan_keys = tuple(dict.fromkeys((*plan_keys, *plan_record["context"])))
+    gates["planReview"] = _gate(
+        plan_record,
+        "context",
+        ctx,
+        plan_keys,
+        lambda saved, now: engine.plan_current({**run, "planReview": {"verdict": "pass", "context": saved}}, now),
+        "verdict",
+    )
+    for name in ("verification", "codeReview"):
+        gates[name] = _gate(
+            run.get(name),
+            "evidence",
+            current,
+            engine.EVIDENCE_KEYS,
+            engine.same_evidence,
+            "passed" if name == "verification" else "verdict",
+        )
+    return gates
+
+
 def explain(run: Run) -> dict[str, Any]:
     report: dict[str, Any] = {
         "version": 1,
@@ -132,32 +164,7 @@ def explain(run: Run) -> dict[str, Any]:
         report["rulesDetail"]["initialPaths"] = [
             item.get("path") for item in initial["files"] if isinstance(item, dict)
         ]
-    plan_record = run.get("planReview")
-    plan_keys = (
-        tuple(ctx)
-        if ctx is not None
-        else ("base", "criteria", "config", "plan", *(("rules",) if run.get("rules") else ()))
-    )
-    # plan_current compares the whole context. Include extra saved keys in differences as well.
-    if isinstance(plan_record, dict) and isinstance(plan_record.get("context"), dict):
-        plan_keys = tuple(dict.fromkeys((*plan_keys, *plan_record["context"])))
-    report["gates"]["planReview"] = _gate(
-        plan_record,
-        "context",
-        ctx,
-        plan_keys,
-        lambda saved, now: engine.plan_current({**run, "planReview": {"verdict": "pass", "context": saved}}, now),
-        "verdict",
-    )
-    for name in ("verification", "codeReview"):
-        report["gates"][name] = _gate(
-            run.get(name),
-            "evidence",
-            current,
-            engine.EVIDENCE_KEYS,
-            engine.same_evidence,
-            "passed" if name == "verification" else "verdict",
-        )
+    report["gates"] = proof_gates(run, ctx, current)
     for name, gate in report["gates"].items():
         if gate["status"] == "unknown" and any("malformed" in reason for reason in gate["reasons"]):
             error("malformed-proof", f"{name}: saved proof could not be compared.")

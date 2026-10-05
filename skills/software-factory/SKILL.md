@@ -106,6 +106,18 @@ ownership. Before delivery, `rename --run <run> --branch feature/<name>` records
 and reconciles a branch rename and invalidates verification/code review; obtain
 fresh evidence afterward. Never manually edit saved branch ownership.
 
+For guided discovery, `guide --repo <repo> --json` shows unfinished/recent runs
+and possible same-task relations. Use `--select <UUID-or-unique-hex-prefix>` (at
+least eight hex characters) for a captured next action and one literal command.
+All run names participate in selection, including omitted/corrupt candidates;
+ambiguity refuses selection. Read reasons/prerequisites before executing separately.
+Done returns no recommendation; history never means merged/released. Owners,
+missing worktrees, blocked budgets, unavailable fingerprinting and drift stay
+explicit. Guide never allocates, resumes, recovers or extends; direction-required
+inspection recommendations cannot authorize mutation. Original gates remain live.
+Only required projections are captured; tree inspection isolates Git directory,
+objects/index/config and refuses filters, with lazy fetching disabled.
+
 For discovery, `runs --repo <repo> --phase <phase> --limit 20 --json` isolates
 unreadable neighbors and shows saved outcomes plus current-next availability.
 Use `history --run <run> --offset 0 --limit 100 --json` for append-order event pages

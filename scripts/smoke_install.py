@@ -161,6 +161,14 @@ def main(plugin: Path | None = None) -> int:
         recorded = cli("history", "--run", directory)
         assert recorded["attempts"][0]["checks"][0]["status"] == "passed"
         assert recorded["totals"]["knownAttempts"] == 1 and recorded["delivery"] == done["delivery"]
+        before = {path: path.read_bytes() for path in directory.rglob("*") if path.is_file()}
+        guided = cli("guide", "--repo", repo, "--select", done["id"][:8])
+        assert guided["version"] == 1 and guided["selected"]["id"] == done["id"]
+        assert guided["selected"]["run"] == str(directory)
+        assert guided["selected"]["recordedOutcome"] == done["delivery"]
+        assert guided["selected"]["next"]["action"] == "done"
+        assert guided["selected"]["recommended"] is None and guided["partial"] is False
+        assert before == {path: path.read_bytes() for path in directory.rglob("*") if path.is_file()}
         skill = Path(cli("skill-path"))
         assert skill == plugin / "skills/software-factory" if plugin else skill.is_relative_to(Path(sys.prefix))
         assert (skill / "SKILL.md").is_file() and (skill / "protocol.md").is_file()
