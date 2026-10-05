@@ -10,6 +10,7 @@ from . import diagnostics, engine, history, pr_description, preflight, progress,
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
+from .resources import skill_path
 from .store import list_runs, read_run
 from .summary import format_summary, summarize
 
@@ -70,7 +71,7 @@ def dispatch(args: argparse.Namespace) -> Any:
 
     action = args.command
     if action == "skill-path":
-        return str(Path(__file__).parent / "skills" / "software-factory")
+        return str(skill_path())
     if action == "init":
         checks = [
             {"name": f"check{i + 1}", "argv": json.loads(raw), "timeoutMs": 120000} for i, raw in enumerate(args.check)

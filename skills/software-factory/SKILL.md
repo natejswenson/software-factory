@@ -10,12 +10,38 @@ factory loop in this session. The CLI is a deterministic evidence ledger; you
 and native host agents perform the reasoning and edits. No model subprocesses,
 paid API calls, daemon, or mandatory external skill is needed.
 
-Use `factory` from the installed Python package. `factory skill-path` locates this
-bundled skill for agent symlinks. From a source checkout, use
-`python3 -m software_factory` in its repository root. All examples below use
-`factory`. Python >=3.11, Git and macOS/Linux are required; no Node runtime is
-needed. Existing saved tasks retain their original executable checks.
-Read [protocol.md](protocol.md) when producing plan or review artifacts.
+## Select the loaded engine
+
+Codex is the primary host. Invoke `$software-factory` and use Codex's native
+read-only subagents for independent plan/code reviews. In Claude Code, use the
+plugin-qualified `software-factory:software-factory` skill and Claude's native
+agent delegation for those same review steps. Apply the same ledger protocol.
+
+Resolve this loaded SKILL.md's physical path before choosing a command:
+
+- **Native plugin or source skill:** its root is two directories above the
+  `skills/software-factory/` directory. Use `python3` plus that root's absolute
+  `scripts/factory.py` path, e.g. `python3 /loaded/plugin/scripts/factory.py`.
+  The launcher validates this root's skill, protocol, engine and PRD resources;
+  it preserves the current directory and uses no global factory command.
+- **Wheel-bundled manual skill:** its physical directory is
+  `<environment>/lib/pythonX.Y/site-packages/software_factory/skills/software-factory`.
+  Resolve that environment's `bin/python` and run it with `-I -m software_factory`.
+  First run its `skill-path` and confirm the returned physical directory equals
+  this loaded skill directory. For another installation layout, establish its
+  exact interpreter and the same path equality before proceeding. If no matching
+  environment can be established, stop with setup guidance; don't use PATH's
+  first `factory` command.
+- **Source contributor:** `python3 -m software_factory` from its checkout root
+  remains supported. Prefer the absolute launcher when targeting another repo.
+
+All examples below use `factory` as shorthand for the verified command selected
+above. Pass the user's application repo/run/worktree explicitly; never infer the
+application from the plugin directory. Python >=3.11, Git and macOS/Linux are
+required; no Node runtime is needed. Existing saved tasks retain their original
+executable checks. Missing resources require restoring the complete loaded plugin,
+with no fallback to a global installation. Read [protocol.md](protocol.md) when
+producing plan or review artifacts.
 
 ## PRD authoring and intake
 

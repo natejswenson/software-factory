@@ -4,6 +4,7 @@ Usage: /path/to/isolated/venv/bin/python scripts/smoke_install.py
 The executing environment must already have the wheel installed.
 """
 
+import argparse
 import json
 import os
 import shutil
@@ -13,9 +14,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 
-def main() -> int:
+def main(plugin: Path | None = None) -> int:
     factory = Path(sys.executable).parent / "factory"
-    if not factory.is_file():
+    command = [sys.executable, str(plugin / "scripts/factory.py")] if plugin else [str(factory)]
+    if not plugin and not factory.is_file():
         raise RuntimeError("Install the wheel into this Python environment first.")
     with TemporaryDirectory(prefix="factory-install-") as temporary:
         root = Path(temporary).resolve()
@@ -23,6 +25,10 @@ def main() -> int:
         bin_dir.mkdir()
         (bin_dir / "git").symlink_to(shutil.which("git"))
         (bin_dir / "python3").symlink_to(sys.executable)
+        if plugin:
+            sentinel = bin_dir / "factory"
+            sentinel.write_text("#!/bin/sh\nexit 99\n")
+            sentinel.chmod(0o755)
         env = {**os.environ, "PATH": str(bin_dir), "PYTHONPATH": "", "GIT_CONFIG_NOSYSTEM": "1"}
         if shutil.which("node", path=env["PATH"]) or shutil.which("npm", path=env["PATH"]):
             raise RuntimeError("Node or npm unexpectedly available.")
@@ -34,7 +40,7 @@ def main() -> int:
             return output.stdout
 
         def cli(*argv):
-            return json.loads(run([str(factory), *map(str, argv), "--json"]))
+            return json.loads(run([*command, *map(str, argv), "--json"]))
 
         repo = root / "repo"
         repo.mkdir()
@@ -156,13 +162,16 @@ def main() -> int:
         assert recorded["attempts"][0]["checks"][0]["status"] == "passed"
         assert recorded["totals"]["knownAttempts"] == 1 and recorded["delivery"] == done["delivery"]
         skill = Path(cli("skill-path"))
-        assert skill.is_relative_to(Path(sys.prefix))
+        assert skill == plugin / "skills/software-factory" if plugin else skill.is_relative_to(Path(sys.prefix))
         assert (skill / "SKILL.md").is_file() and (skill / "protocol.md").is_file()
-        assert run([str(factory), "--help"])
+        canonical = Path(__file__).resolve().parents[1] / "skills/software-factory"
+        for name in ("SKILL.md", "protocol.md"):
+            assert (skill / name).read_bytes() == (canonical / name).read_bytes()
+        assert run([*command, "--help"])
         print(
             json.dumps(
                 {
-                    "installedLifecycle": "passed",
+                    "pluginLifecycle" if plugin else "installedLifecycle": "passed",
                     "nodeOnPath": False,
                     "npmOnPath": False,
                     "bundledSkill": "present",
@@ -174,4 +183,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plugin-root", type=Path)
+    args = parser.parse_args()
+    sys.exit(main(args.plugin_root.resolve() if args.plugin_root else None))
