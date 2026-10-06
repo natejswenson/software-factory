@@ -162,6 +162,12 @@ def main(plugin: Path | None = None) -> int:
         assert recorded["attempts"][0]["checks"][0]["status"] == "passed"
         assert recorded["totals"]["knownAttempts"] == 1 and recorded["delivery"] == done["delivery"]
         before = {path: path.read_bytes() for path in directory.rglob("*") if path.is_file()}
+        guided = cli("guide", "--repo", repo, "--select", done["id"][:8])
+        assert guided["version"] == 1 and guided["selected"]["id"] == done["id"]
+        assert guided["selected"]["run"] == str(directory)
+        assert guided["selected"]["recordedOutcome"] == done["delivery"]
+        assert guided["selected"]["next"]["action"] == "done"
+        assert guided["selected"]["recommended"] is None and guided["partial"] is False
         handoff = cli("integration", "--run", directory, "--target", "main")
         assert handoff["version"] == 1 and handoff["recordedDelivery"] == done["delivery"]
         assert handoff["target"]["commit"] == run(["git", "rev-parse", "main"], repo).strip()

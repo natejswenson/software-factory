@@ -10,6 +10,53 @@
 
 Examples use `factory` as shorthand for the [loaded engine](../../skills/software-factory/SKILL.md#select-the-loaded-engine). Use `factory --help` for accepted flags. Commands with `--json` preserve exact values; consult each section for exit-code differences.
 
+## Find a saved run and its next step
+
+```sh
+factory guide --repo /path/to/app
+factory guide --repo /path/to/app --select 1234abcd --json
+```
+
+Guide prioritizes unfinished runs, then sorts by saved UTC update time and ID.
+It shows unfinished rows and up to20 recent done rows, with a total display cap
+of100 and explicit omitted counts. Healthy rows remain visible beside unreadable
+records. Whitespace-normalized exact task hashes identify possible same-task
+attempts; they never establish supersession, obsolescence or completion.
+
+Select one exact UUID or a unique hexadecimal prefix of8–32 characters, matched
+against hyphenless IDs across all supported run names, including older omitted
+or corrupt candidates. Ambiguity returns candidates without choosing a run.
+Traversal and foreign run paths are invalid; actions still bind exact run paths.
+
+JSON version1 returns repo, runs, possibleRelations, selected, candidates, omitted,
+errors, partial and limitations. Each row labels recordedOutcome and
+currentAvailability separately. Selected adds next/action/reason, findings,
+diagnostics, progress, captured summary and recommended. The recommendation has
+literal argv, reason, requiresDirection and an expected artifact path when useful.
+Plan/review examples require authoring or native review before submission;
+implementation recommends verification after the edits. Human examples use POSIX
+shell quoting. Commands are data, never executed by guide.
+
+Any owner prevents source snapshots. Active verification uses pinned progress
+observations; unknown or interrupted progress stays partial. Missing worktrees
+retain recorded delivery, and terminal done always has recommended=null. Blocked
+budgets recommend inspection with explicit direction required. No recovery, budget
+extension, resume, allocation, phase edits or remote queries happen automatically.
+
+Only context is captured for context-only engine actions. When a tree is required,
+Git uses a disposable directory, index, object store and configuration, copying
+effective attributes and local/global ignore rules with their precedence; the actual
+repository object store is preserved too. Every Git call disables lazy fetching
+and optional locks. Configured filter drivers (including required-only), sparse
+worktrees, missing objects or unsupported Git leave required tree inspection
+unknown. Newly configured filters cannot execute during isolated capture. Changed
+state, ownership, context, HEAD or required fingerprint discards current advice.
+
+Exit0 means a complete view, including an ordinary live wait. Exit2 means invalid
+selection, ambiguity, partial or blocked observation; exit3 means top-level
+infrastructure failure. Historical delivery never means merged, released or remote
+CI passed. Existing commands and all mutation gates retain their interfaces.
+
 ## Optional task preflight
 
 ```sh

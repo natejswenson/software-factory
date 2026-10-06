@@ -7,7 +7,7 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from . import diagnostics, engine, history, integration, pr_description, preflight, progress, review_context
+from . import diagnostics, engine, guide, history, integration, pr_description, preflight, progress, review_context
 from .delivery import deliver
 from .errors import FactoryError
 from .git import repository
@@ -36,7 +36,7 @@ def parser() -> Parser:
         "command",
         nargs="?",
         default="help",
-        help="init, prd-init, preflight, integration, start, list, runs, history, status, next, summary, explain, review-context, pr-description, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
+        help="init, prd-init, preflight, integration, guide, start, list, runs, history, status, next, summary, explain, review-context, pr-description, progress, logs, rules, resume, plan, plan-review, verify, review, deliver, recover, extend, rename, skill-path",
     )
     for option in (
         "repo",
@@ -53,6 +53,7 @@ def parser() -> Parser:
         "stage",
         "check-name",
         "phase",
+        "select",
         "target",
     ):
         result.add_argument(f"--{option}")
@@ -91,6 +92,8 @@ def dispatch(args: argparse.Namespace) -> Any:
         return preflight.inspect(
             required("repo"), required("worktree-root"), base=args.base, branch=args.branch, endpoint=args.endpoint
         )
+    if action == "guide":
+        return guide.inspect(required("repo"), select=args.select)
     if action == "integration":
         return integration.inspect(str(Path(required("run")).absolute()), required("target"))
     if action == "start":
@@ -171,6 +174,8 @@ def format_output(action: str, result: Any) -> str:
         return pr_description.format_preview(result)
     if action == "skill-path":
         return result
+    if action == "guide":
+        return guide.format_report(result)
     if action == "integration":
         return integration.format_report(result)
     if action == "preflight":
@@ -258,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2 if args.observation_blocked else 0
         if args.command == "explain":
             return diagnostics.exit_code(result)
+        if args.command == "guide":
+            return guide.exit_code(result)
         if args.command == "preflight":
             return preflight.exit_code(result)
         if isinstance(result, dict) and (

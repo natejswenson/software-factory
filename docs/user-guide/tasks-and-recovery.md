@@ -10,6 +10,28 @@
 
 Examples use `factory` as shorthand for the [loaded-engine command](../../skills/software-factory/SKILL.md#select-the-loaded-engine). Native plugins bind their own engine; they do not install a global CLI.
 
+## Find the right saved task
+
+Start with `factory guide --repo /path/to/app`. Select one displayed UUID or
+unique prefix of at least eight hexadecimal characters:
+
+```sh
+factory guide --repo /path/to/app --select 1234abcd
+```
+
+The selected view brings together recorded delivery, current availability,
+findings, stale-proof explanation or active progress, and one recommended command.
+Read its reason and prerequisites, then execute it separately. An ambiguous ID
+shows candidates; it never chooses by recency. Possible same-task groups do not
+mean an older attempt is obsolete.
+
+A done run has no action recommendation even when its worktree is gone. Unknown
+inputs stay partial; blocked budgets and interrupted/unknown owners need
+inspection or explicit direction. Guide creates no task or gate evidence and
+performs no recovery or resume. Add `--json` for literal argv and exact values.
+See the [reference](../reference/commands.md#find-a-saved-run-and-its-next-step)
+for bounds, inspection limitations and exit codes.
+
 ## Tasks and recovery
 
 Your agent normally handles these commands:

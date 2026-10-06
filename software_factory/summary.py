@@ -6,8 +6,8 @@ from .engine import describe
 from .store import Run
 
 
-def summarize(run: Run) -> dict[str, Any]:
-    status = describe(run)
+def summarize(run: Run, *, captured_next: dict[str, Any] | None = None) -> dict[str, Any]:
+    status = {"next": captured_next} if captured_next is not None else describe(run)
     next_step = {
         key: value
         for key, value in status["next"].items()

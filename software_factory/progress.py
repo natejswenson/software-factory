@@ -208,10 +208,10 @@ def _duration(results: list[dict[str, Any]]) -> int | None:
     return sum(values) if values else None
 
 
-def observe(run: Run) -> dict[str, Any]:
+def project(run: Run, before: tuple) -> dict[str, Any]:
+    """Project pinned observations; caller owns snapshot consistency checks."""
     attempt = _counter(run)
     names = [item["name"] for item in run["config"]["checks"]]
-    before = _snapshot(run)
     _, raw, owner, initial_limitations = before
     limitations = list(initial_limitations)
     sidecar = None
@@ -298,6 +298,12 @@ def observe(run: Run) -> dict[str, Any]:
                 for item in report["checks"]:
                     if item["status"] in ("running", "pending"):
                         item["status"] = "unknown"
+    return report
+
+
+def observe(run: Run) -> dict[str, Any]:
+    before = _snapshot(run)
+    report = project(run, before)
     _stable(run, before)
     return report
 

@@ -314,7 +314,8 @@ def check_verified(run: Run) -> dict[str, Any]:
     return current
 
 
-def next_action(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) -> dict[str, Any]:
+def next_action(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN,
+                observation: dict[str, Any] | None = None) -> dict[str, Any]:
     if run.get("renameIntent"):
         return {"action": "resume", "reason": "Reconcile interrupted branch rename."}
     if run["phase"] == "preparing":
@@ -328,7 +329,9 @@ def next_action(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) 
             "failures": run["failures"],
             "limit": run["failureLimit"],
         }
-    ctx = context(run) if captured_plan is _LIVE_PLAN else context(run, captured_plan=captured_plan)
+    # Observer-only input avoids repeated snapshots; all mutation gates use live defaults.
+    ctx = observation["context"] if observation is not None else (
+        context(run) if captured_plan is _LIVE_PLAN else context(run, captured_plan=captured_plan))
     if not ctx["plan"]:
         return {"action": "plan", "output": str(Path(run["dir"]) / "plan.md")}
     review = run.get("planReview")
@@ -342,12 +345,13 @@ def next_action(run: Run, *, captured_plan: bytes | None | object = _LIVE_PLAN) 
             "action": "implement",
             "reason": "Fix failed checks, then verify." if failed else "Implement the reviewed plan, then verify.",
         }
-    current = evidence(run) if captured_plan is _LIVE_PLAN else evidence(run, captured_plan=captured_plan)
+    current = observation["evidence"] if observation is not None else (
+        evidence(run) if captured_plan is _LIVE_PLAN else evidence(run, captured_plan=captured_plan))
     verification, code_review = run.get("verification"), run.get("codeReview")
     if (
         code_review
         and code_review["verdict"] == "pass"
-        and own_delivery_commit(run, current)
+        and (observation["ownedDelivery"] if observation is not None else own_delivery_commit(run, current))
         and same_evidence(code_review["evidence"], verification["evidence"])
     ):
         return {
