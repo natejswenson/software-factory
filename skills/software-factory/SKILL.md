@@ -158,6 +158,17 @@ a separately authorized task with normal verification/review/delivery.
 
 ## Drive the loop
 
+In the plan and reviewer inputs, map each criterion/public claim to relevant
+asserting tests or actual observed evidence. Label synthetic fault injection,
+real Git/process observations and live delivery separately; explain applicable
+boundary risks, omitted cases and unobserved platforms. For this repository use
+the [boundary test contract](https://github.com/natejswenson/software-factory/blob/main/docs/development/boundary-tests.md).
+After a repaired review finding, provide its asserting regression before fresh
+full checks/review. Review test relevance for each nonempty commit; discoverable
+IDs, structural checks, test counts or nonempty evidence strings cannot certify
+behavior, reviewer independence or delivery, or bypass freshness/failure limits.
+Keep the existing exact context/evidence and artifact schemas unchanged.
+
 After each step call `next --run <run> --json` and carry out its next action.
 Use `explain --run <run> --json` when proof is missing or stale: it separates
 historical verdicts from freshness, lists fingerprint differences and edits since
